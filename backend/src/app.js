@@ -62,7 +62,11 @@ const io = new Server(server, {
       "http://adeyebingo.com",
       "http://www.adeyebingo.com",
       "http://www.adeyebingo.com",
-      "http://api.adeyebingo.com"
+      "http://api.adeyebingo.com",
+       "http://new.adeyebingo.com",
+      "https://new.adeyebingo.com",
+      "http://www.new.adeyebingo.com",
+      "https://www.new.adeyebingo.com"
     ],
     methods: ["GET", "POST"],
     credentials: true
@@ -82,7 +86,10 @@ const allowedOrigins = [
   // ADD THESE TWO LINES:
   'http://api.adeyebingo.com',    // ← ADD THIS (HTTP)
   'https://api.adeyebingo.com',   // ← YOU ALREADY HAVE THIS
-  
+  'http://new.adeyebingo.com',
+  'https://new.adeyebingo.com',
+  'http://www.new.adeyebingo.com',
+  'https://www.new.adeyebingo.com'
   // ... rest of your origins
 ];
 app.use(cors({
