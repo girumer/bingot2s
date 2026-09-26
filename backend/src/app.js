@@ -441,36 +441,65 @@ socket.on("authenticate", async ({ initData }) => {
     return;
   }
 
-  const verified = verifyTelegramInitData(initData, process.env.BOT_TOKEN);
+  const verified = verifyTelegramInitData(
+    initData,
+    process.env.BOT_TOKEN
+  );
+
   if (!verified) {
-    socket.emit("auth_error", { message: "Invalid or expired initData" });
+    socket.emit("auth_error", {
+      message: "Invalid or expired initData"
+    });
     return;
   }
 
   try {
     const userData = JSON.parse(verified.user);
+
     const telegramId = userData.id;
     const username = userData.username || userData.first_name;
 
-    // Verify user exists in DB
     const user = await BingoBord.findOne({ telegramId });
+
     if (!user) {
-      socket.emit("auth_error", { message: "User not registered. Use /start on Telegram." });
+      socket.emit("auth_error", {
+        message: "User not registered. Use /start on Telegram."
+      });
       return;
     }
 
-    // Store authentication info for this socket
+    // Stable ID for this Telegram user
+    const clientId = `tg_${user.telegramId}`;
+
+    // Store authentication information
     authenticatedSockets.set(socket.id, {
       telegramId: user.telegramId,
       username: user.username,
-      clientId: `tg_${user.telegramId}`   // consistent clientId
+      clientId
     });
 
-    socket.emit("auth_success", { message: "Authenticated", user: { username: user.username, wallet: user.Wallet } });
-    console.log(`✅ Socket ${socket.id} authenticated as ${user.username}`);
+    // Connect stable player ID to the NEW socket
+    clientIdToSocketId.set(clientId, socket.id);
+
+    // Tell frontend authentication succeeded
+    socket.emit("auth_success", {
+      message: "Authenticated",
+      user: {
+        username: user.username,
+        wallet: user.Wallet
+      }
+    });
+
+    console.log(
+      `✅ Socket ${socket.id} authenticated as ${user.username}`
+    );
+
   } catch (err) {
     console.error("Authentication error:", err);
-    socket.emit("auth_error", { message: "Server error" });
+
+    socket.emit("auth_error", {
+      message: "Server error"
+    });
   }
 });
   // --- JOIN ROOM ---
@@ -644,52 +673,60 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
 // --- DISCONNECT ---
 socket.on("disconnect", () => {
   const clientId = socketIdToClientId.get(socket.id);
-   authenticatedSockets.delete(socket.id);
+
+  authenticatedSockets.delete(socket.id);
+
   if (!clientId) return;
 
-  // Clean up maps
   socketIdToClientId.delete(socket.id);
-  clientIdToSocketId.delete(clientId);
 
-  for (const roomId in rooms) {
-    const room = rooms[roomId];
-    if (!room || !room.players[clientId]) continue;
+  console.log(
+    `⚠️ ${clientId} disconnected. Waiting 15 seconds for refresh...`
+  );
 
-    // --- START OF FIX ---
-    // We only delete the player if the game is NOT currently running.
-    // If room.activeGame is true, we keep the data so you can win during refresh.
-    if (!room.activeGame) {
+  setTimeout(() => {
 
+    // Check whether this SAME player has connected with a NEW socket
+    const currentSocketId = clientIdToSocketId.get(clientId);
 
-      
-      delete room.playerCartelas[clientId];
-      delete room.players[clientId];
+    if (currentSocketId && currentSocketId !== socket.id) {
+      console.log(
+        `✅ ${clientId} reconnected with new socket. Keeping player/cartela.`
+      );
+      return;
+    }
 
-      // Check if room is now empty (Only relevant if game hasn't started)
-      const playersWithCartela = Object.values(room.playerCartelas).filter(
-        arr => arr.length > 0
-      ).length;
+    // Remove stale socket mapping
+    if (currentSocketId === socket.id) {
+      clientIdToSocketId.delete(clientId);
+    }
 
-      if (playersWithCartela === 0) {
-        const totalPlayers = Object.keys(room.players).length;
-        if (totalPlayers === 0) {
-          resetRoom(roomId);
-          delete rooms[roomId];
-        } else {
-          resetRoom(roomId);
-        }
+    // Player did not reconnect within 15 seconds
+    for (const roomId in rooms) {
+      const room = rooms[roomId];
+
+      if (!room || !room.players[clientId]) continue;
+
+      if (!room.activeGame) {
+        delete room.playerCartelas[clientId];
+        delete room.players[clientId];
+
+        console.log(
+          `🗑️ ${clientId} removed from room ${roomId} after timeout`
+        );
       }
-    } 
-    // --- END OF FIX ---
 
-    // Broadcast updated player count
-    // Because we didn't delete the data above, this count will stay at 16.
-    const activePlayers = Object.values(room.playerCartelas)
-      .reduce((sum, arr) => sum + arr.length, 0);
+      const activePlayers = Object.values(room.playerCartelas)
+        .reduce((sum, arr) => sum + arr.length, 0);
 
-    io.to(roomId).emit("playerCount", { totalPlayers: activePlayers });
-    break;
-  }
+      io.to(roomId).emit("playerCount", {
+        totalPlayers: activePlayers
+      });
+
+      break;
+    }
+
+  }, 15000);
 });
 });
 
