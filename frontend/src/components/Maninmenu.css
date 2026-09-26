@@ -1,0 +1,263 @@
+.play-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 20px;
+  background: linear-gradient(135deg, #0e0e11, #030507);
+  color: rgb(37, 26, 26);
+  min-height: 80vh;
+}
+.top-button-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: linear-gradient(90deg, #181818, #1f1726);
+  border-radius: 15px;
+  margin: 15px auto;
+  width: 95%;
+  max-width: 500px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+}
+
+.top-btn {
+  flex: 1;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deposit-btn {
+  background: #4cafef;
+  color: white;
+}
+
+.deposit-btn:hover {
+  background: #3a9edb;
+  transform: translateY(-2px);
+}
+
+.wallet-btn {
+  background: #f5f5f5;
+  color: #1f1b28;
+  
+}
+
+.wallet-btn:disabled {
+  opacity: 0; /* Keep visible even when disabled */
+}
+
+
+.welcome-text {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 30px;
+  color: #ebd6d6;
+  text-align: center;
+}
+
+
+.rooms {
+  display: flex;
+  flex-direction: column; /* vertical stack */
+  gap: 20px;
+  width: 100%;
+  height: 80%;
+  max-width: 400px; /* narrower for mobile */
+}
+/* Rooms Table */
+.rooms-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: #302424;
+}
+
+/* Table headers */
+.rooms-table th {
+  background: #101728; /* blue */
+  color: rgb(231, 224, 224);
+  text-align: center;
+  padding: 14px;
+  font-size: 16px;
+  border-radius: 15%;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 5px solid #0f0f10;
+}
+
+/* Table rows */
+.rooms-table td {
+  text-align: center;
+  padding: 14px;
+  font-size: 15px;
+  border-radius: 5px;
+  color: #d6dbe0;
+  gap: 5px;
+  font-weight: 500;
+  border-bottom: 5px solid #0f0f10;
+}
+
+/* Zebra striping */
+.rooms-table tr:nth-child(even) td {
+  background: #0c0d0d;
+}
+.rooms-table tr:nth-child(odd) td {
+  background: #242d2d;
+}
+/* Hover effect */
+.rooms-table tr:hover td {
+  background: #1f2122;
+  transition: background 0.3s ease;
+}
+
+/* Play button inside table */
+.rooms-table .play-btn {
+  background: #050a68; /* green */
+  color: white;
+  font-weight: bold;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.rooms-table .play-btn:hover {
+  background: #059669;
+  transform: scale(1.05);
+}
+
+.rooms-table .play-icon {
+  font-size: 14px;
+}
+
+
+.room-card {
+  background: rgb(56, 53, 53);
+  padding: 5px;
+  border-radius: 15px;
+  text-align: center;
+   color: rgb(27, 27, 27);
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.room-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0px 6px 18px rgba(0,0,0,0.15);
+}
+
+.play-btn {
+  margin-top: 15px;
+  padding: 12px 20px;
+  font-size: 48px;
+  border: none;
+  border-radius: 10px;
+  background: #05117b;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  font-size: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+  width: 100%; /* make button full width of card */
+}
+
+.play-btn:hover {
+  background: #18035d;
+}
+
+.play-icon {
+  font-size: 18px;
+}
+
+.wallet-display {
+  margin-top: 40px;
+  font-size: 20px;
+  font-weight: bold;
+  background: #1f1414;
+  padding: 15px 25px;
+  border-radius: 12px;
+  box-shadow: 0px 3px 10px rgba(193, 191, 191, 0.1);
+  text-align: center;
+}
+.top-button-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: linear-gradient(90deg, #0b0b0c, #764ba2);
+  border-radius: 15px;
+  margin: 15px auto;
+  width: 95%;
+  max-width: 500px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+}
+
+.top-btn {
+  flex: 1;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deposit-btn {
+  background: #4cafef;
+  color: white;
+}
+
+.deposit-btn:hover {
+  background: #3a9edb;
+  transform: translateY(-2px);
+}
+
+.wallet-btn {
+  background: #0a0909;
+  color: #f8f4f4;
+  cursor: default;
+  box-shadow: inset 0px 2px 6px rgba(0,0,0,0.1);
+}
+
+.wallet-btn:disabled {
+  opacity: 1; /* Keep visible even when disabled */
+}
+
+
+/* Responsive for smaller screens */
+@media (max-width: 480px) {
+  .play-page {
+    padding: 20px 10px;
+  }
+
+  .rooms {
+    max-width: 100%;
+  }
+
+  .welcome-text {
+    font-size: 24px;
+  }
+
+  .play-btn {
+    font-size: 15px;
+    padding: 10px;
+  }
+}

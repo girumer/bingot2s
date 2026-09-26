@@ -1,0 +1,68 @@
+.wallet-container {
+  padding: 20px;
+  max-width: 400px;
+  margin: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.wallet-balance {
+  text-align: center;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  transition: all 0.5s ease;
+}
+
+.wallet-balance.deposit {
+  color: green;
+  transform: scale(1.1);
+}
+
+.wallet-balance.withdraw {
+  color: red;
+  transform: scale(1.1);
+}
+
+.wallet-input,
+.wallet-select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+.wallet-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+.wallet-button {
+  width: 48%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.wallet-button.deposit {
+  background-color: #4caf50;
+  color: white;
+}
+
+.wallet-button.deposit:hover {
+  background-color: #45a049;
+}
+
+.wallet-button.withdraw {
+  background-color: #f44336;
+  color: white;
+}
+
+.wallet-button.withdraw:hover {
+  background-color: #da190b;
+}

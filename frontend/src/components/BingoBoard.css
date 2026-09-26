@@ -1,0 +1,482 @@
+/* ==========================================================================
+   1. GLOBAL SYSTEM RESETS & VIEWPORT LOCKING
+   ========================================================================== */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Fullscreen app envelope */
+.bingo-board-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  padding: 4px;
+  background-color: #dbaff8a5; 
+  gap: 4px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   2. TOP PANEL HEADER TRACKING
+   ========================================================================== */
+.top-stats {
+  flex: 0 0 8%;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: #ad99f7db;
+  border-radius: 6px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.stat-button {
+  padding: 4px 8px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* ==========================================================================
+   3. WORKSPACE SPLIT ENGINE
+   ========================================================================== */
+.main-content-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  overflow: hidden;
+  gap: 4px;
+  height: calc(100% - 8% - 4px); /* Scales dynamic space factoring top stats header */
+}
+
+/* ==========================================================================
+   4. LEFT COLUMN: MASTER 1-75 GRID & CONTROLS
+   ========================================================================== */
+.left-column-layout {
+  flex: 0 0 46%; /* Locks footprint to allow maximum width for cards on the right */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Master Grid Grid Backdrop */
+.numbers-grid-wrapper {
+  flex: 1; 
+  display: flex;
+  flex-direction: row; 
+  align-items: stretch; /* Stretches inner columns vertically */
+  justify-content: space-between;
+  padding: 4px;
+  background-color: #dbaff8a5; /* Matched exactly to container wrapper background */
+  border-radius: 6px;
+  box-sizing: border-box;
+  gap: 2px;
+}
+
+.number-column-group {
+  display: flex;
+  flex-direction: column; 
+  gap: 2px; /* Uniform separation between items */
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  justify-content: space-between;
+}
+
+/* Column Header Letters */
+.letter-button {
+  width: 100%;
+  max-width: 32px;
+  height: 26px;
+  background: #1e1b4b; 
+  color: #ffffff; 
+  border-radius: 4px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 11px; 
+  font-weight: 900;
+  flex-shrink: 0;
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Master Grid Numbers Individual Styles */
+.number-button {
+  width: 100%;
+  max-width: 32px;
+  flex: 1; /* Automatically scales up/down to seamlessly absorb workspace height */
+  min-height: 0; /* Prevents text bounds from ignoring container restrictions */
+  background: rgba(225, 247, 247, 0.533); 
+  border: 1px solid rgba(0, 0, 0, 0.12); 
+  border-radius: 4px; 
+  display: flex;
+  color: #0f172a; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 11px; 
+  font-weight: 700;
+}
+
+/* --- COLUMN MATCHED DYNAMIC MASTER CHIP GRADIENTS --- */
+.number-button.called.b {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important; border-color: #1e40af !important;
+  box-shadow: 0 1px 3px rgba(29, 78, 216, 0.4);
+}
+.number-button.called.i {
+  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%) !important;
+  color: #ffffff !important; border-color: #3730a3 !important;
+  box-shadow: 0 1px 3px rgba(67, 56, 202, 0.4);
+}
+.number-button.called.n {
+  background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%) !important;
+  color: #ffffff !important; border-color: #6b21a8 !important;
+  box-shadow: 0 1px 3px rgba(126, 34, 206, 0.4);
+}
+.number-button.called.g {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%) !important;
+  color: #ffffff !important; border-color: #065f46 !important;
+  box-shadow: 0 1px 3px rgba(4, 120, 87, 0.4);
+}
+.number-button.called.o {
+  background: linear-gradient(135deg, #f97316 0%, #c2410c 100%) !important;
+  color: #ffffff !important; border-color: #9a3412 !important;
+  box-shadow: 0 1px 3px rgba(194, 65, 12, 0.4);
+}
+
+/* --- VERTICALLY STACKED UTILITY CONTROL FOOTER --- */
+.toggle-container-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px;
+  background-color: rgba(15, 23, 42, 0.16); 
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.toggle-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.toggle-label { 
+  font-size: 11px; 
+  font-weight: 800; 
+  color: #1e1b4b; 
+  letter-spacing: 0.3px;
+}
+
+/* Custom Toggle Hardware Styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(255, 255, 255, 0.45);
+  transition: .3s;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px; width: 14px;
+  left: 2px; bottom: 2px;
+  background-color: #ffffff;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+input:checked + .toggle-slider { background-color: #10b981; }
+input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+/* Vertically stacked full-width refresh action button */
+.refresh-action-button {
+  width: 100%;
+  padding: 6px 0;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(185, 28, 28, 0.2);
+  text-align: center;
+  letter-spacing: 0.5px;
+  transition: transform 0.1s ease;
+}
+.refresh-action-button:active {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   5. RIGHT COLUMN: TRACKING DISPLAYS & SCROLLING CARDS
+   ========================================================================== */
+.bottom-panels {
+  flex: 0 0 54%; /* Takes up wider space allocation for clear board scrolling */
+  display: flex;
+  flex-direction: column;
+  background-color: #dbaff8a5; 
+  gap: 4px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.fixed-control-header {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* --- ENLARGED TRACKING HEADERS --- */
+.last-called-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.last-called-number {
+  width: 65px; /* Massive clear layout sphere */
+  height: 65px;
+  border-radius: 50%;
+  background: #0f172a; 
+  color: white;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-weight: 900; 
+  font-size: 20px; /* Highly legible rendering font size */
+  box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.last-five-display { 
+  display: flex; 
+  gap: 5px; 
+  justify-content: center;
+  width: 100%;
+}
+
+.last-five-number {
+  width: 32px; /* Enlarged tracking secondary spheres */
+  height: 32px; 
+  border-radius: 50%;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 11px; 
+  font-weight: 800; 
+  color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+.last-five-number.b { background: #3b82f6; }
+.last-five-number.i { background: #6366f1; }
+.last-five-number.n { background: #a855f7; }
+.last-five-number.g { background: #10b981; }
+.last-five-number.o { background: #f97316; }
+
+/* --- ENGINE FOR SCROLLING PANEL HOUSING --- */
+.scrollable-cards-viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 1px;
+}
+.scrollable-cards-viewport::-webkit-scrollbar { width: 3px; }
+.scrollable-cards-viewport::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+
+.bottom-left {
+  background-color: transparent;
+  width: 100%;
+}
+
+.cartelas-container-horizontal {
+  display: flex;
+  flex-direction: column; 
+  align-items: center; 
+  gap: 10px;
+  width: 100%;
+}
+
+/* ==========================================================================
+   6. PREMIUM ATTRACTIVE CARTELA LOOK
+   ========================================================================== */
+.cartela-display {
+   
+  width: 100%;
+  max-width: 205px; /* Keeps the cards perfectly proportionate and beautiful */
+  background: linear-gradient(135deg, #ffffff7e 0%, #edeeef 100%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 6px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.1), 0 1px 2px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease;
+}
+.cartela-display:hover {
+  transform: translateY(-1px);
+}
+
+.cartela-header { 
+  display: flex; 
+  gap: 2px; 
+  margin-bottom: 3px; 
+}
+
+.cartela-header-cell {
+  font-size: 16px; 
+  font-weight: 900; 
+  height: 20px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  border-radius: 3px; 
+  color: rgb(255, 255, 255); 
+  flex: 1;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.15);
+  box-shadow: inset 0 -1.5px 0 rgba(0,0,0,0.1);
+}
+.cartela-header-cell.b { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
+.cartela-header-cell.i { background: linear-gradient(180deg, #6366f1, #4338ca); }
+.cartela-header-cell.n { background: linear-gradient(180deg, #a855f7, #7e22ce); }
+.cartela-header-cell.g { background: linear-gradient(180deg, #10b981, #047857); }
+.cartela-header-cell.o { background: linear-gradient(180deg, #f97316, #c2410c); }
+
+.cartela-rows-container { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 2px; 
+}
+.cartela-row { 
+  display: flex; 
+  gap: 2px; 
+}
+
+.cartela-cell { 
+  flex: 1; 
+  height: 24px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-weight: 900; 
+  font-size: 16px; 
+  background: #ceccceb5; 
+  border: 1px solid #e2e8f0; 
+  border-radius: 4px; 
+  box-sizing: border-box; 
+  color: #283547;
+  transition: all 0.1s ease;
+}
+
+/* Dynamic styling for when a user selects a cell value manually */
+.cartela-cell.clicked {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white !important; 
+  border-color: #047857;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.2);
+}
+
+/* Highlights auto-selected matched numbers on player cards */
+.cartela-cell.highlighted { 
+  background-color: rgb(92, 134, 102); 
+  color: #ffffff; 
+}
+
+.cartela-index { 
+  text-align: center; 
+  font-size: 9px; 
+  font-weight: 800; 
+  color: #64748b; 
+  margin-top: 4px; 
+  text-transform: uppercase; 
+  letter-spacing: 0.3px;
+}
+
+.bingo-button { 
+  width: 100%; 
+  height: 26px; 
+  font-size: 11px; 
+  font-weight: 800; 
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+  color: white; 
+  border: none; 
+  border-radius: 5px; 
+  cursor: pointer; 
+  margin-top: 4px; 
+  box-shadow: 0 1.5px 3px rgba(220, 38, 38, 0.25);
+  letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   7. GAME WINNER MODALS
+   ========================================================================== */
+.winner-popup {
+  position: fixed;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ece3e3;
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 1000;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  max-width: 90%;
+}
+
+.winner-highlight {
+  background-color: rgb(15, 139, 98) !important;
+  border: 3px solid rgb(20, 12, 17) !important;
+  color: rgb(12, 10, 10);
+  font-weight: bold !important;
+  transform: scale(1.1);
+}
+.winner-popup h2 { margin-bottom: 10px; color: #01060b; }
+.winner-cartelas-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; color: #01060b; }
+.winner-cartela { min-width: 120px; color: white; flex: 1 0 auto; }
+
+/* ==========================================================================
+   8. SMARTPHONE MEDIA ADAPTATION (Perfect responsive fit)
+   ========================================================================== */
+@media (max-width: 480px) {
+  .left-column-layout { flex: 0 0 45%; }
+  .bottom-panels { flex: 0 0 55%; }
+  
+  /* Buttons expand to context boundaries organically without max-height limits */
+  .number-button { font-size: 10px; border-radius: 3px; max-width: 28px; }
+  .letter-button { height: 20px; font-size: 10px; border-radius: 3px; max-width: 28px; }
+  
+  .last-called-number { width: 52px; height: 52px; font-size: 17px; }
+  .last-five-number { width: 25px; height: 25px; font-size: 10px; }
+  
+  .cartela-display { max-width: 100%; padding: 4px; border-radius: 8px; }
+  .cartela-cell { height: 22px; font-size: 10px; border-radius: 3px; }
+  .cartela-header-cell { height: 18px; font-size: 10px; }
+  .toggle-label { font-size: 9px; }
+  .refresh-action-button { padding: 4px 0; font-size: 10px; }
+}

@@ -1,0 +1,32 @@
+.spinner-selection {
+  text-align: center;
+  padding: 20px;
+}
+
+.number-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+  margin-top: 20px;
+}
+
+.number-item {
+  background: #eee;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.number-item.selected {
+  background: #4caf50;
+  color: white;
+}
+
+.submit-btn {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: #2196f3;
+  color: white;
+  border: none;
+  cursor: pointer;
+}

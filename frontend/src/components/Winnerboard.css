@@ -1,0 +1,32 @@
+.carteladisp{
+    display: flex;
+    flex-direction: column;
+     
+     justify-content: center;
+}
+.winerdisp{
+    display: flex;
+    flex-direction: column;
+    
+     justify-content: center;
+    
+}
+  .playCartela1{
+   
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(5,1fr);
+ 
+    
+   
+}
+.playCartela1 .boxes{
+    background-color: #f4d756;
+    height: 45px;
+    border-radius: 10%;
+    color: #0c0c0c;
+    
+    margin-top: 5px;
+
+}
+ 

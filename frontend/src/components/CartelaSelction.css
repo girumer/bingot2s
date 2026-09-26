@@ -1,0 +1,328 @@
+/* ==========================================================================
+   1. Layout Wrapper
+   ========================================================================== */
+.Cartelacontainer-wrapper {
+  min-height: 100vh;
+  background-color: #dbaff8a5;
+  margin: 0;
+  padding: 5px;
+  box-sizing: border-box;
+  padding-bottom: 20px;
+}
+
+.Cartelacontainer-wrapper > .wallet-stake-display {
+  margin-top: 0;
+  margin-bottom: 0px;
+  padding-top: 0px;
+}
+
+/* ==========================================================================
+   2. Top Display Buttons (Wallet, Active Game, Stake)
+   ========================================================================== */
+.wallet-stake-display {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: 5px;
+  margin: 0px 0;
+  flex-wrap: nowrap;
+}
+
+.display-btn {
+  flex: 1 1 30%;
+  margin: 0.4rem;
+  padding: 0.6rem;
+  max-width: 120px;
+  min-width: 80px;
+  background-color: #dbaff8a5;
+  color: rgb(35, 17, 17);
+  font-weight: bold;
+  text-align: center;
+  border-radius: 4px;
+  box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
+}
+
+/* ==========================================================================
+   3. Timer Display & Pulse Animation
+   ========================================================================== */
+.timer-display {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #962706;
+  text-align: center;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%   { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.6; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================================================
+   4. Cartela Grid Container (Enables clean scrolling for 200 items)
+   ========================================================================== */
+.Cartelacontainer {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-auto-rows: minmax(42px, auto);
+  gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  align-content: start;
+  height: 60vh;
+  max-height: 620px;
+  min-height: 320px;
+  padding: 5px;
+  -webkit-overflow-scrolling: touch;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+
+/* Custom Scrollbar for Telegram */
+.Cartelacontainer::-webkit-scrollbar {
+  width: 4px;
+}
+
+.Cartelacontainer::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+
+.Cartelacontainer::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+/* ==========================================================================
+   5. Individual Cartela Buttons (State Color Changes Handled by React)
+   ========================================================================== */
+.cartela {
+  width: 100%;
+  height: 42px;
+  min-width: 30px;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  font-size: 1.1rem;
+  border-radius: 4px;
+  padding: 2px;
+  transition: transform 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cartela:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   6. Selection Controls Area - FIXED: Horizontal layout with vertical buttons
+   ========================================================================== */
+.selection-controls-area {
+  display: flex;
+  flex-direction: row; /* Main container is horizontal */
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 10px;
+  width: 100%;
+  flex-wrap: wrap; /* Allow wrapping on very small screens if needed */
+}
+
+/* Side button container - THIS IS WHAT MAKES BUTTONS VERTICAL */
+.side-button-container {
+  display: flex;
+  flex-direction: column; /* Stack buttons vertically (up and down) */
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Button styling - adjust width as needed */
+.side-button-container .game_start, 
+.side-button-container .game_start1 {
+  width: 110px;
+  height: 45px;
+  margin: 0;
+  font-size: 14px;
+  min-width: 90px;
+}
+
+/* For very small screens, make buttons a bit smaller but keep vertical */
+@media (max-width: 400px) {
+  .side-button-container .game_start, 
+  .side-button-container .game_start1 {
+    width: 80px;
+    height: 40px;
+    font-size: 12px;
+    min-width: 70px;
+  }
+  
+  .selection-controls-area {
+    gap: 8px;
+  }
+}
+
+.pending-cartelas {
+  margin: 0;
+}
+
+/* Preview Card Styles */
+.cartela-display1 {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: transparent !important;
+  padding: 15px;
+  border-radius: 0px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.cartela-row1 {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.cartela-cell1 {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #333;
+  border-radius: 5px;
+  font-weight: bold;
+  background-color: #d3c6b794;
+  color: black;
+  cursor: default;
+  transition: background-color 0.3s, color 0.3s;
+  font-size: 1.1rem;
+}
+
+.cartela-cell1:hover {
+  background-color: #a6a398;
+  color: #f3fbff;
+}
+
+/* ==========================================================================
+   7. Game Action Button States
+   ========================================================================== */
+.game_start {
+  width: 150px;
+  height: 50px;
+  padding: 12px 0;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: #375516;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.game_start:disabled {
+  background-color: #935353;
+  cursor: not-allowed;
+}
+
+.game_start:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.game_start1 {
+  width: 150px;
+  height: 50px;
+  padding: 12px 0;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  margin-top: 10px;
+  border-radius: 8px;
+  background-color: #ff4000;
+  color: #f4f6f6;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.game_start1:disabled {
+  background-color: #935353;
+  cursor: not-allowed;
+}
+
+.game_start1:hover:not(:disabled) {
+  background-color: #ff4000;
+}
+
+/* Override button margins when inside side-button-container */
+.side-button-container .game_start,
+.side-button-container .game_start1 {
+  margin-top: 0; /* Remove extra margin since we use gap in container */
+}
+
+/* ==========================================================================
+   8. Mobile Responsiveness For Telegram WebApps
+   ========================================================================== */
+@media (max-width: 480px) {
+  .Cartelacontainer {
+    height: 50vh;
+    grid-auto-rows: minmax(32px, auto);
+    gap: 4px;
+  }
+  
+  .cartela {
+    height: 32px;
+    font-size: 0.8rem;
+    min-width: 22px;
+  }
+  
+  .cartela-cell1 {
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+  }
+  
+  /* Keep buttons vertical on mobile too */
+  .side-button-container {
+    flex-direction: column !important; /* Ensure vertical stacking */
+  }
+  
+  .selection-controls-area {
+    flex-direction: row; /* Keep main container horizontal */
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .Cartelacontainer {
+    height: 42vh;
+    gap: 3px;
+  }
+  
+  .cartela {
+    height: 26px;
+    font-size: 0.65rem;
+    min-width: 18px;
+  }
+  
+  /* Ensure vertical stacking even on very small screens */
+  .side-button-container {
+    flex-direction: column !important;
+  }
+  
+  .side-button-container .game_start, 
+  .side-button-container .game_start1 {
+    width: 70px;
+    height: 35px;
+    font-size: 11px;
+    min-width: 60px;
+  }
+  
+  .selection-controls-area {
+    gap: 5px;
+  }
+}

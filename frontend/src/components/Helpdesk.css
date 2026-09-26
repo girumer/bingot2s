@@ -1,0 +1,59 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: Arial, sans-serif; /* Optional: set a default font */
+  }
+  
+  .containers {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh; /* Full viewport height */
+  }
+  
+  .title {
+    text-align: center; /* Center the title */
+    margin: 5px ; /* Add some margin to the title */
+    margin-bottom: 5px;
+    margin-top: 5px;
+  }
+  
+  .button-container {
+    display: flex;
+    flex: 1; /* Take remaining space */
+    flex-direction: column; 
+    margin-top: 5px;/* Stack buttons vertically */
+    width: 100%;
+  }
+  
+  .button {
+    flex: 1; /* Make buttons fill the container equally */
+    margin: 5px; /* Add some margin between buttons */
+    background-color: #007BFF; /* Button background color */
+    color: white; /* Button text color */
+    border: none; /* Remove default border */
+    border-radius: 8px; /* Rounded corners */
+    font-size: 20px; /* Font size */
+    cursor: pointer; /* Pointer cursor on hover */
+    transition: background-color 0.3s; /* Smooth background color transition */
+    display: flex; /* Use flex to align icon */
+    justify-content: space-between; /* Space between text and icon */
+    align-items: center;
+    text-align: center;
+    width: 100%; /* Center items vertically */
+  }
+  
+  .button:hover {
+    background-color: #0056b3; /* Darker shade on hover */
+  }
+  
+  .icon {
+    margin-left: 10px; /* Add space between text and icon */
+  }
+  
+  .paragraph {
+    margin: 10px 0; /* Add some margin above and below the paragraph */
+    font-size: 16px; /* Font size for the paragraph */
+    color: rgb(10, 10, 10); /* Text color for the paragraph */
+  }
+  

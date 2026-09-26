@@ -1,0 +1,117 @@
+.modalBackground {
+    width: 100vw;
+    height: 100vh;
+    background-color: rgb(240, 240, 242);
+    position: fixed;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .modalContainer {
+    width: 500px;
+    height: 500px;
+    border-radius: 12px;
+    background-color: rgb(100, 130, 231);
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+    
+    display: flex;
+    flex-direction: column;
+    padding: 25px;
+  }
+  
+  .modalContainer .title {
+    display: inline-block;
+    color: aliceblue;
+    text-align: center;
+    margin-top: 15px;
+  }
+  h2{
+    color: aliceblue;
+  }
+  
+  .titleCloseBtn {
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .titleCloseBtn button {
+    background-color: transparent;
+    border: none;
+    font-size: 25px;
+    cursor: pointer;
+  }
+  
+  .modalContainer .body {
+    display: flex;
+    flex-direction: column;
+    flex: 50%;
+    margin-top: 20px;
+    display: flex;
+    justify-content: start;
+    align-items: start;
+    font-size: 1.7rem;
+    text-align: center;
+    color: aliceblue;
+  }
+  .radiodisp{
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    margin-top: 25px;
+    gap: 15px;
+  }
+  h5{
+    align-items: center;
+  }
+  .modalContainer .footer {
+    flex: 20%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+ .amountinput input{
+    width: 100%;
+    height: 30px;
+    border-radius: 30px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+  }
+  .amountinput{
+    align-items: start;
+    display: flex;
+    flex-direction: column;
+
+  }
+   .preference .p {
+    align-items: center;
+    color: aqua;
+  }
+  .amountinput .input{
+    width: 100%;
+  }
+   .footer button {
+    width: 150px;
+    height: 45px;
+    margin: 30px;
+    border: none;
+    background-color: rgb(82, 68, 111);
+    align-items: center;
+    color: white;
+    border-radius: 30px;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .underline {
+    border-bottom: 2px solid black;  /* This creates the underline */
+    width: 100%;  /* Adjust this percentage as needed */
+    margin-bottom: 50px ; 
+    margin-top: 20px; /* Center the underline and add spacing */
+  }
+  
+  .underline2{
+    border-bottom: 2px solid black;  /* This creates the underline */
+    width: 100%;  /* Adjust this percentage as needed */
+    margin-top: 50px;
+    
+  }
