@@ -22,7 +22,55 @@ html, body {
   box-sizing: border-box;
   overflow: hidden;
 }
+.jack-container {
+  width: 100%;
+  max-width: 700px;
+  margin: 10px auto;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #181818;
+  box-sizing: border-box;
+}
 
+.jack-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.jack-header strong {
+  font-size: 18px;
+}
+
+.jack-progress-background {
+  width: 100%;
+  height: 14px;
+  background: #333;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.jack-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #f5b400;
+  border-radius: 10px;
+  transition: width 1s linear;
+}
+
+.jack-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.jack-pending {
+  font-weight: bold;
+}
 /* ==========================================================================
    2. TOP PANEL HEADER TRACKING
    ========================================================================== */

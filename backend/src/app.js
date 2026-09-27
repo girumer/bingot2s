@@ -422,9 +422,128 @@ function startInjectionMonitor(rId, initiatorClientId) {
         }
     }, 3000); // Check every 5 seconds (adjust as needed)
 }
+// ================= JACK BOT =================
 
+const JACK_AMOUNT = 100;
+const JACK_CYCLE_MS = 60 * 60 * 1000;
+
+// Jack is global and exists only in server memory.
+// It is NOT stored in MongoDB.
+const jackBot = {
+  amount: 0,
+  pending: false,
+  cycleStartedAt: null,
+  cycleEndsAt: null
+};
+
+function initializeJackBot() {
+  const now = Date.now();
+
+  // Start at the current hourly boundary.
+  const cycleStart = Math.floor(now / JACK_CYCLE_MS) * JACK_CYCLE_MS;
+  const cycleEnd = cycleStart + JACK_CYCLE_MS;
+
+  jackBot.amount = JACK_AMOUNT;
+  jackBot.pending = false;
+  jackBot.cycleStartedAt = cycleStart;
+  jackBot.cycleEndsAt = cycleEnd;
+
+  console.log(
+    `[JACK] Started new cycle: ${new Date(cycleStart).toLocaleString()}`
+  );
+}
+
+function getJackState() {
+  const now = Date.now();
+
+  if (!jackBot.cycleStartedAt || !jackBot.cycleEndsAt) {
+    initializeJackBot();
+  }
+
+  const elapsed = now - jackBot.cycleStartedAt;
+
+  let progress = Math.min(
+    100,
+    Math.max(0, (elapsed / JACK_CYCLE_MS) * 100)
+  );
+
+  let remainingSeconds = Math.max(
+    0,
+    Math.ceil((jackBot.cycleEndsAt - now) / 1000)
+  );
+
+  return {
+    amount: jackBot.amount,
+    pending: jackBot.pending,
+    progress,
+    remainingSeconds,
+    cycleStartedAt: jackBot.cycleStartedAt,
+    cycleEndsAt: jackBot.cycleEndsAt
+  };
+}
+
+function broadcastJackState() {
+  const state = getJackState();
+
+  io.emit("jack:update", state);
+}
+
+function finishJackCycle() {
+  const now = Date.now();
+
+  // Make sure we don't finish the same cycle repeatedly.
+  if (now < jackBot.cycleEndsAt) {
+    return;
+  }
+
+  jackBot.pending = true;
+
+  console.log(
+    `[JACK] Hour finished. ${JACK_AMOUNT} ETB is now pending for the next winner.`
+  );
+
+  broadcastJackState();
+}
+
+function awardJackToWinner(winnerName) {
+  if (!jackBot.pending) {
+    return 0;
+  }
+
+  const jackAmount = jackBot.amount;
+
+  console.log(
+    `[JACK] ${jackAmount} ETB awarded to ${winnerName}`
+  );
+
+  // Reset Jack immediately.
+  jackBot.amount = JACK_AMOUNT;
+  jackBot.pending = false;
+
+  const now = Date.now();
+
+  // Start a new 60-minute cycle from this moment.
+  jackBot.cycleStartedAt = now;
+  jackBot.cycleEndsAt = now + JACK_CYCLE_MS;
+
+  broadcastJackState();
+
+  return jackAmount;
+}
+
+initializeJackBot();
+
+// Check Jack every second.
+setInterval(() => {
+  if (!jackBot.pending && Date.now() >= jackBot.cycleEndsAt) {
+    finishJackCycle();
+  }
+
+  broadcastJackState();
+}, 1000);
 // =========================================================================
 const rooms = {}; // rooms = { roomId: { players, selectedIndexes, playerCartelas, ... } }
+
 const socketIdToClientId = new Map();
 const clientIdToSocketId = new Map();
 const authenticatedSockets = new Map();
@@ -552,7 +671,8 @@ socket.on("authenticate", async ({ initData }) => {
     totalAward: rooms[rId].totalAward,
     totalPlayers: Object.values(rooms[rId].playerCartelas).reduce((sum, arr) => sum + arr.length, 0),
     activeGame: rooms[rId].activeGame || false,
-    gameId: rooms[rId].gameId || null
+    gameId: rooms[rId].gameId || null,
+     jack: getJackState()
   });
 
   const activePlayers = Object.values(rooms[rId].playerCartelas).reduce((sum, arr) => sum + arr.length, 0);
@@ -998,25 +1118,42 @@ async function checkWinners(roomId, calledNumber) {
   // Update winners
   // REPLACE your winner update block with this:
 await Promise.all(winners.map(async (winner) => {
+
+    const jackAward = awardJackToWinner(winner.winnerName);
+
+    const finalAward = awardPerWinner + jackAward;
+
+    console.log(
+        `[WINNER] ${winner.winnerName} normal=${awardPerWinner} Jack=${jackAward} total=${finalAward}`
+    );
+
     await BingoBord.updateOne(
         { username: winner.winnerName },
         { 
-            $inc: { Wallet: awardPerWinner, coins: 1 }, // Updates balance instantly
+            $inc: {
+                Wallet: finalAward,
+                coins: 1
+            },
+
             $push: {
                 gameHistory: {
                     $each: [{
                         roomId: Number(roomId),
-                        stake: Number(awardPerWinner),
+                        stake: Number(finalAward),
                         outcome: "win",
                         timestamp: new Date(),
                         gameId: room.gameId || Date.now()
                     }],
-                    $slice: -50 // CRITICAL: This trims the 10,000 items down to 50!
+                    $slice: -50
                 }
             }
         }
-    ).catch(err => console.error("Winner update failed:", err));
+    ).catch(err =>
+        console.error("Winner update failed:", err)
+    );
+
     winnerUsernames.add(winner.winnerName);
+
 }));
 
   // Update losers

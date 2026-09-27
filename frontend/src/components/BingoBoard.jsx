@@ -147,7 +147,12 @@ function BingoBoard() {
   const [winners, setWinners] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
   const [iAmWinner, setIAmWinner] = useState(false);
-
+const [jack, setJack] = useState({
+  amount: 100,
+  pending: false,
+  progress: 0,
+  remainingSeconds: 3600
+});
   const gameIdRef = useRef(`${roomId}-${Date.now()}`);
 
 const clientId = telegramId ? `tg_${telegramId}` : null;
@@ -260,7 +265,9 @@ const clientId = telegramId ? `tg_${telegramId}` : null;
     if (state.gameId !== undefined && state.gameId !== null) {
       setGameId(state.gameId);
     }
-
+    if (state.jack) {
+  setJack(state.jack);
+      }
     // IMPORTANT:
     // Restore my cartelas after refresh
     if (state.myCartelas) {
@@ -333,7 +340,19 @@ const clientId = telegramId ? `tg_${telegramId}` : null;
     socket.on("gameStarted", handleGameStarted);
     return () => socket.off("gameStarted", handleGameStarted);
   }, []);
+useEffect(() => {
 
+  const handleJackUpdate = (jackState) => {
+    setJack(jackState);
+  };
+
+  socket.on("jack:update", handleJackUpdate);
+
+  return () => {
+    socket.off("jack:update", handleJackUpdate);
+  };
+
+}, []);
   useEffect(() => {
     const handleWinningPattern = (winnersArr) => {
       console.log("WINNERS PAYLOAD:", JSON.stringify(winnersArr, null, 2));
@@ -374,6 +393,7 @@ const clientId = telegramId ? `tg_${telegramId}` : null;
     <div className="bingo-board-wrapper">
       {/* TOP STATS */}
       <div className="top-stats">
+      
          <div className="stat-button">
             GameID {gameId || "Waiting..."}
           </div>
@@ -385,7 +405,49 @@ const clientId = telegramId ? `tg_${telegramId}` : null;
         <div className="stat-button">👥 Players {totalPlayers}</div>
         <div className="stat-button">🔢 {allCalledNumbers.length}/75</div>
       </div>
+{/* JACK BOT */}
+<div className="jack-container">
 
+  <div className="jack-header">
+    <span>🎰 JACK BOT</span>
+
+    <strong>
+      {jack.amount.toLocaleString()} ETB
+    </strong>
+  </div>
+
+  <div className="jack-progress-background">
+
+    <div
+      className="jack-progress-fill"
+      style={{
+        width: `${jack.progress}%`
+      }}
+    />
+
+  </div>
+
+  <div className="jack-info">
+
+    {jack.pending ? (
+      <span className="jack-pending">
+        🎁 100 ETB READY — NEXT WINNER
+      </span>
+    ) : (
+      <span>
+        {Math.floor(jack.remainingSeconds / 60)}:
+        {String(jack.remainingSeconds % 60).padStart(2, "0")}
+        {" "}remaining
+      </span>
+    )}
+
+    <span>
+      {Math.round(jack.progress)}%
+    </span>
+
+  </div>
+
+</div>
       {/* CORE DESKTOP AND MOBILE CONTENT SPLIT */}
     <div className="main-content-layout">
   
