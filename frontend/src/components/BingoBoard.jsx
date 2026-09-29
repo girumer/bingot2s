@@ -147,6 +147,7 @@ function BingoBoard() {
   const [winners, setWinners] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
   const [iAmWinner, setIAmWinner] = useState(false);
+  const [jackWinnerPopup, setJackWinnerPopup] = useState(null);
 const [jack, setJack] = useState({
   amount: 100,
   pending: false,
@@ -352,6 +353,25 @@ useEffect(() => {
     socket.off("jack:update", handleJackUpdate);
   };
 
+}, []);
+useEffect(() => {
+  const handleJackWinner = ({ winnerName, amount }) => {
+    setJackWinnerPopup({
+      winnerName,
+      amount
+    });
+
+    // Hide after 5 seconds
+    setTimeout(() => {
+      setJackWinnerPopup(null);
+    }, 5000);
+  };
+
+  socket.on("jack:winner", handleJackWinner);
+
+  return () => {
+    socket.off("jack:winner", handleJackWinner);
+  };
 }, []);
   useEffect(() => {
     const handleWinningPattern = (winnersArr) => {
@@ -596,7 +616,27 @@ useEffect(() => {
           </div>
         </div>
       )}
+{jackWinnerPopup && (
+  <div className="jack-winner-overlay">
+    <div className="jack-winner-popup">
+      <div className="jack-winner-icon">🎰</div>
 
+      <h1>🎉 JACKPOT WINNER! 🎉</h1>
+
+      <p className="jack-winner-name">
+        {jackWinnerPopup.winnerName}
+      </p>
+
+      <p className="jack-winner-amount">
+        💰 +{jackWinnerPopup.amount.toLocaleString()} ETB
+      </p>
+
+      <p className="jack-winner-message">
+        Congratulations!
+      </p>
+    </div>
+  </div>
+)}
     </div>
   );
 }

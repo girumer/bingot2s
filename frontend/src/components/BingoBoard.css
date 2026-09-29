@@ -71,6 +71,85 @@ html, body {
 .jack-pending {
   font-weight: bold;
 }
+.jack-winner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0, 0, 0, 0.75);
+
+  animation: jackOverlayIn 0.3s ease;
+}
+
+.jack-winner-popup {
+  width: min(90%, 420px);
+  padding: 30px 25px;
+
+  text-align: center;
+
+  background: #181818;
+  border: 3px solid #f5b400;
+  border-radius: 20px;
+
+  box-shadow:
+    0 0 30px rgba(245, 180, 0, 0.6),
+    0 0 80px rgba(245, 180, 0, 0.25);
+
+  animation: jackPopupIn 0.5s ease;
+}
+
+.jack-winner-icon {
+  font-size: 55px;
+  margin-bottom: 10px;
+}
+
+.jack-winner-popup h1 {
+  margin: 0 0 15px;
+  font-size: 26px;
+}
+
+.jack-winner-name {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.jack-winner-amount {
+  font-size: 30px;
+  font-weight: bold;
+  margin: 15px 0;
+}
+
+.jack-winner-message {
+  font-size: 18px;
+  margin-top: 10px;
+}
+
+@keyframes jackPopupIn {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes jackOverlayIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
 /* ==========================================================================
    2. TOP PANEL HEADER TRACKING
    ========================================================================== */

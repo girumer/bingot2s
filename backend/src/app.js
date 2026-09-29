@@ -425,7 +425,7 @@ function startInjectionMonitor(rId, initiatorClientId) {
 // ================= JACK BOT =================
 
 const JACK_AMOUNT = 100;
-const JACK_CYCLE_MS = 5 * 5 * 1000;
+const JACK_CYCLE_MS = 5 * 60 * 1000;
 
 // Jack is global and exists only in server memory.
 // It is NOT stored in MongoDB.
@@ -515,7 +515,10 @@ function awardJackToWinner(winnerName) {
   console.log(
     `[JACK] ${jackAmount} ETB awarded to ${winnerName}`
   );
-
+    io.emit("jack:winner", {
+    winnerName,
+    amount: jackAmount
+  });
   // Reset Jack immediately.
   jackBot.amount = JACK_AMOUNT;
   jackBot.pending = false;
