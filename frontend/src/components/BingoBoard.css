@@ -28,7 +28,7 @@ html, body {
   margin: 10px auto;
   padding: 10px 14px;
   border-radius: 12px;
-  background: #e26363;
+  background: #dbaff8a5;
   box-sizing: border-box;
 }
 
@@ -80,7 +80,7 @@ html, body {
   align-items: center;
   justify-content: center;
 
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(207, 190, 190, 0.75);
 
   animation: jackOverlayIn 0.3s ease;
 }
@@ -91,7 +91,7 @@ html, body {
 
   text-align: center;
 
-  background: #181818;
+  background: #494e4b;
   border: 3px solid #f5b400;
   border-radius: 20px;
 
