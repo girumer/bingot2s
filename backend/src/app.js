@@ -177,7 +177,7 @@ function verifyTelegramInitData(initData, botToken) {
 // Define the players you want to inject
 // Define the players you want to inject
 const forcedPlayersData = [
-    /*{ username: 'amanu', clientId: 'tg_amanu_fake' },
+    { username: 'amanu', clientId: 'tg_amanu_fake' },
     
     { username: 'soloman', clientId: '200003x' },
  
@@ -201,7 +201,7 @@ const forcedPlayersData = [
      {username: "tsegihshmuze",clientId: '200033x'},
      {username: "jemal_76545",clientId: '200032x'},
      {username: "kida_25133",clientId: '200031x'},
-     {username: "ali_987630",clientId: '200030x'},*/
+     {username: "ali_987630",clientId: '200030x'},
 
 
 
@@ -217,7 +217,7 @@ const forcedPlayersData = [
     { username: "burabu_3456", clientId: '200037bx' },
     { username: "mastushewa", clientId: '200037gx' },
     { username: "gerekirkose", clientId: '200037jx' },
-    /* //greae
+    //greae
     { username: "kibrom_98766", clientId: '20003011' },
    { username: "mesfin_turo", clientId: '2000311' },
     { username: "mulatu_7546", clientId: '2000321' },
@@ -230,7 +230,7 @@ const forcedPlayersData = [
            { username: "doc_eremi", clientId: '2004372' },
             { username: "biruk_mec", clientId: '2005372' },
              { username: "gramachew", clientId: '2006372' }
-           */
+           
     
 ];
 // Note: clientId must be unique strings for the game logic to work correctly.
@@ -351,7 +351,7 @@ function startInjectionMonitor(rId, initiatorClientId) {
             // Optionally force-start countdown if enough players have cartelas
             const playersWithCartela = Object.values(room.playerCartelas).filter(arr => arr.length > 0).length;
             if (!room.timer && playersWithCartela >= 2) {
-                startCountdown(rId, 35);
+                startCountdown(rId, 30);
             }
             return;
         }
@@ -359,7 +359,7 @@ function startInjectionMonitor(rId, initiatorClientId) {
         // Countdown check (same as before)
         const playersWithCartela = Object.values(room.playerCartelas).filter(arr => arr.length > 0).length;
         if (!room.timer && playersWithCartela >= 2) {
-            startCountdown(rId, 15);
+            startCountdown(rId, 30);
         }
 
         // Inject next bot
@@ -425,7 +425,7 @@ function startInjectionMonitor(rId, initiatorClientId) {
 // ================= JACK BOT =================
 
 const JACK_AMOUNT = 100;
-const JACK_CYCLE_MS = 5 * 60 * 1000;
+const JACK_CYCLE_MS = 60 * 60 * 1000;
 
 // Jack is global and exists only in server memory.
 // It is NOT stored in MongoDB.
