@@ -277,33 +277,52 @@ bot.onText(/\/(balance|play|deposit|history|help|withdraw|coins)/, async (msg, m
     }
 });
 bot.onText(/^\/start\s?(\d+)?$/, async (msg, match) => {
-    try {
-        const chatId = msg.chat.id;
-        const referrerId = match[1];
+  try {
+    const chatId = msg.chat.id;
+    const referrerId = match[1];
 
-        let user = await BingoBord.findOne({ telegramId: chatId });
+    let user = await BingoBord.findOne({ telegramId: chatId });
 
-        if (!user) {
-            userStates[chatId] = { step: "waitingForContact" };
+    if (!user) {
+      userStates[chatId] = { step: "waitingForContact" };
 
-            if (referrerId && !isNaN(referrerId) && Number(referrerId) !== chatId) {
-                userStates[chatId].referrerId = Number(referrerId);
-            }
+      // If the link carries a referrer, persist it immediately
+      if (referrerId && !isNaN(referrerId) && Number(referrerId) !== chatId) {
+        const rid = Number(referrerId);
 
-            bot.sendMessage(chatId, "Welcome! Please share your phone number to register:", {
-                reply_markup: {
-                    keyboard: [[{ text: "📱 Share Contact", request_contact: true }]],
-                    resize_keyboard: true,
-                    one_time_keyboard: true,
-                    remove_keyboard: true
-                }
-            });
-        } else {
-            bot.sendMessage(chatId, `Welcome back, ${user.username}!`, mainMenu);
-        }
-    } catch (error) {
-        console.error("Error in /start handler:", error);
-    }
+        await BingoBord.findOneAndUpdate(
+          { telegramId: chatId },
+          {
+            $setOnInsert: {
+              telegramId: chatId,
+              username: `pending_${chatId}`,     // temp unique username
+              phoneNumber: `pending_${chatId}`,  // temp unique phone
+              Wallet: 0,
+              gameHistory: [],
+              pendingReferrerId: rid,
+              referralBonusPaid: false,
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        userStates[chatId].referrerId = rid;
+      }
+
+      bot.sendMessage(chatId, "Welcome! Please share your phone number to register:", {
+        reply_markup: {
+          keyboard: [[{ text: "📱 Share Contact", request_contact: true }]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+          remove_keyboard: true,
+        },
+      });
+    } else {
+      bot.sendMessage(chatId, `Welcome back, ${user.username}!`, mainMenu);
+    }
+  } catch (error) {
+    console.error("Error in /start handler:", error);
+  }
 });
 bot.onText(/\/changeusername/, async (msg) => {
     const chatId = msg.chat.id;
@@ -695,24 +714,31 @@ bot.on("contact", async (msg) => {
   if (state && state.step === "waitingForContact") {
     console.log(`Contact phone raw: "${contact.phone_number}"`);
     const db = mongoose.connection.db;
-    let cleanPhone = contact.phone_number.replace(/^\+/, '');
-    const blocked = await db.collection('blockednumbers').findOne({ phoneNumber: cleanPhone });
+    let cleanPhone = contact.phone_number.replace(/^\+/, "");
+
+    const blocked = await db.collection("blockednumbers").findOne({ phoneNumber: cleanPhone });
     if (blocked) {
       bot.sendMessage(chatId, "⛔ This phone number is not allowed to register. Contact support if you believe this is an error.");
       delete userStates[chatId];
       return;
     }
 
-    // Check if this telegramId is already registered
-    let existingUser = await BingoBord.findOne({ telegramId: chatId });
+    // Check for existing real registration (ignore placeholders)
+    let existingUser = await BingoBord.findOne({
+      telegramId: chatId,
+      phoneNumber: { $not: /^pending_/ },
+    });
     if (existingUser) {
       bot.sendMessage(chatId, "⚠️ You are already registered!");
       delete userStates[chatId];
       return;
     }
 
-    // Check if the phone number is already registered by another user
-    existingUser = await BingoBord.findOne({ phoneNumber: contact.phone_number });
+    // Check duplicate phone number (ignore placeholders)
+    existingUser = await BingoBord.findOne({
+      phoneNumber: contact.phone_number,
+      phoneNumber: { $not: /^pending_/ },
+    });
     if (existingUser) {
       bot.sendMessage(chatId, "⚠️ This phone number is already registered by another user.");
       delete userStates[chatId];
@@ -723,40 +749,55 @@ bot.on("contact", async (msg) => {
     const baseName = rawName.replace(/\s+/g, "").toLowerCase();
     const uniqueUsername = await generateUniqueUsername(baseName);
 
-    const newUser = new BingoBord({
-      telegramId: chatId,
-      username: uniqueUsername,
-      phoneNumber: contact.phone_number,
-      Wallet: 7,
-      gameHistory: [],
-      referredBy: state.referrerId || null,
-      referralBonusPaid: false,
-    });
+    // Resolve the referrer: prefer pendingReferrerId on the placeholder,
+    // then fall back to in-memory state.
+    let referrerId = state?.referrerId || null;
+    const placeholder = await BingoBord.findOne({ telegramId: chatId });
+    if (placeholder?.pendingReferrerId) {
+      referrerId = placeholder.pendingReferrerId;
+    }
 
-    await newUser.save();
+    // Upsert the final user record, overwriting the placeholder
+    const newUser = await BingoBord.findOneAndUpdate(
+      { telegramId: chatId },
+      {
+        $set: {
+          username: uniqueUsername,
+          phoneNumber: contact.phone_number,
+          Wallet: 7,
+          gameHistory: [],
+          referredBy: referrerId,
+          referralBonusPaid: false,
+          pendingReferrerId: null,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     // ----------------------
-    // Referral bonus: +2 Birr to direct referrer, capped at 10 successful invites
+    // Referral bonus: capped at 10 invites (using countDocuments on real referredBy)
     // ----------------------
-    if (state.referrerId) {
+    if (referrerId) {
       try {
-        const MAX_REFERRALS = 2;
+        const MAX_REFERRALS = 10;
 
+        // Count users that ACTUALLY have this referrer AND are past placeholder stage
         const previousInvites = await BingoBord.countDocuments({
-          referredBy: state.referrerId,
+          referredBy: referrerId,
+          phoneNumber: { $not: /^pending_/ },
         });
 
         console.log(
-          `Referrer ${state.referrerId} has ${previousInvites} previous invites (cap: ${MAX_REFERRALS})`
+          `Referrer ${referrerId} has ${previousInvites} previous invites (cap: ${MAX_REFERRALS})`
         );
 
         if (previousInvites >= MAX_REFERRALS) {
           console.log(
-            `Referrer ${state.referrerId} reached the ${MAX_REFERRALS}-invite cap. No bonus paid for invite of ${chatId}.`
+            `Referrer ${referrerId} reached the ${MAX_REFERRALS}-invite cap. No bonus paid.`
           );
         } else {
           const referrer = await BingoBord.findOneAndUpdate(
-            { telegramId: state.referrerId },
+            { telegramId: referrerId },
             { $inc: { Wallet: 2 } },
             { new: true }
           );
@@ -776,7 +817,7 @@ bot.on("contact", async (msg) => {
               console.error("Referral tx log failed:", txErr.message);
             }
           } else {
-            console.error(`Referrer not found: ${state.referrerId}`);
+            console.error(`Referrer not found: ${referrerId}`);
           }
         }
       } catch (bonusErr) {
