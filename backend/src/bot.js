@@ -740,7 +740,7 @@ bot.on("contact", async (msg) => {
     // ----------------------
     if (state.referrerId) {
       try {
-        const MAX_REFERRALS = 4;
+        const MAX_REFERRALS = 2;
 
         const previousInvites = await BingoBord.countDocuments({
           referredBy: state.referrerId,
