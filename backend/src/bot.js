@@ -148,7 +148,7 @@ const mainMenu = {
        
       ],
       [
-        { text: "🔗 Referral Link", callback_data: "referral" },
+        { text: "🔗 Invite", callback_data: "referral" },
          { text: "🎮 Game History", callback_data: "gameHistory" },
         
       ],
@@ -166,12 +166,14 @@ const commands = [
   { command: "start", description: "🏠 start" }, // Corrected line
   { command: "balance", description: "💰 Check your balance" },
   { command: "play", description: "🎮 Play Bingo" },
+  { command: "invite", description: "🎁 Invite friends" },
   { command: "deposit", description: "📥 Deposit funds" },
   { command: "coins", description: "🪙 Check your Coin balance" },
   { command: "withdraw", description: "📤 Withdraw" },
   { command: "history", description: "📜 game  history" },
   { command: "changeusername", description: "✏️ Change your username" },
   { command: "transferwallet", description: "➡️ Transfer funds" }, 
+  
   { command: "help", description: "ℹ️ Help info" },
    
 ];
@@ -304,6 +306,34 @@ bot.onText(/^\/start\s?(\d+)?$/, async (msg, match) => {
     } catch (error) {
         console.error("Error in /start handler:", error);
     }
+});
+bot.onText(/\/invite/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  const user = await BingoBord.findOne({ telegramId: chatId });
+  if (!user) {
+    bot.sendMessage(chatId, "You are not registered. Please use /start to begin.");
+    return;
+  }
+
+  const botInfo = await bot.getMe();
+  const botUsername = botInfo.username;
+  const referralLink = `https://t.me/${botUsername}?start=${chatId}`;
+
+  const captionText = `
+<i>Here is your personal invite link!</i>
+
+ከታች ያለውን ሊንክ ለወዳጆቾ በመጋበዝ ጓደኛዎን ሲጋብዙ 2 ብር ያገኛሉ።
+
+🔗 ${referralLink}
+
+እየተዝናን አብረን  እንስራ
+`;
+
+  await bot.sendMessage(chatId, captionText, {
+    parse_mode: "HTML",
+    disable_web_page_preview: false,
+  });
 });
 bot.onText(/\/changeusername/, async (msg) => {
     const chatId = msg.chat.id;
@@ -1085,7 +1115,7 @@ case "referral":
 
 ከታች ያለውን ሊንክ ለወዳጆቾ በመጋበዝ ጓደኛዎን ሲጋብዙ 2 ብር ያገኛሉ።
 
-🔗 <a href="${referralLink}">Click Here to Invite</a>
+🔗 ${referralLink}
 
 እየተዝናን አብረን  እንስራ
 `;
