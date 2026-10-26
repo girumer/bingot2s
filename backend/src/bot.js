@@ -1061,27 +1061,27 @@ try {
  }
  break;
 case "referral":
-    // Get the bot's username dynamically from the API.
     const botInfo = await bot.getMe();
     const botUsername = botInfo.username;
-    
-    // Use the bot's username and the correct user ID from the callbackQuery.
     const referralLink = `https://t.me/${botUsername}?start=${callbackQuery.from.id}`;
-    
-    // This is the file_id you found.
-    const botProfilePictureId = 'AgACAgQAAxkBAAIK7mjE1Y1VX0ivUkBQGwJsXW08-92LAAKm0DEb55coUv1XJCHTpYurAQADAgADeAADNgQ'; 
-    
-    // Use the [Text](URL) format to create a clickable link
-const captionText = `
+
+    const captionText = `
 <i>Here is your personal referral link!</i>
-    
+
 ከታች ያለውን ሊንክ ለወዳጆቾ በመጋበዝ ጓደኛዎን ሲጋብዙ 2 ብር ያገኛሉ።
-    
+
 🔗 <a href="${referralLink}">Click Here to Invite</a>
-    
+
 እየተዝናን አብረን  እንስራ
 `;
-//bot.sendPhoto(chatId, botProfilePictureId, { caption: captionText, parse_mode: 'HTML' });
+
+    await bot.sendMessage(chatId, captionText, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: false,   // show the t.me link preview
+    });
+
+    // Acknowledge the button tap
+    answerQuery("", false);
     
     
     break;
