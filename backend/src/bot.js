@@ -732,7 +732,38 @@ bot.on("contact", async (msg) => {
     });
 
     await newUser.save();
+          // ----------------------
+    // Referral bonus: +2 Birr to the direct referrer (silent, no message)
+    // ----------------------
+    if (state.referrerId) {
+      try {
+        const referrer = await BingoBord.findOneAndUpdate(
+          { telegramId: state.referrerId },
+          { $inc: { Wallet: 2 } },
+          { new: true }
+        );
 
+        if (referrer) {
+          try {
+            await Transaction.create({
+              transactionNumber: `REF${new mongoose.Types.ObjectId().toString()}`,
+              phoneNumber: referrer.phoneNumber,
+              method: "referral_bonus",
+              type: "bonus",
+              amount: 2,
+              rawMessage: `Referral bonus for inviting telegramId ${chatId}`,
+              status: "completed",
+            });
+          } catch (txErr) {
+            console.error("Referral tx log failed:", txErr.message);
+          }
+        } else {
+          console.error(`Referrer not found: ${state.referrerId}`);
+        }
+      } catch (bonusErr) {
+        console.error("Referral bonus error:", bonusErr);
+      }
+    }
     delete userStates[chatId];
     bot.sendMessage(chatId, "✅ Registration complete! 🎉", mainMenu);
   }
@@ -1044,7 +1075,7 @@ case "referral":
 const captionText = `
 <i>Here is your personal referral link!</i>
     
-ከታች ያለውን ሊንክ ለወዳጆቾ በመጋበዝ የጋበዟቸው ደንበኞች ከሚያስቀምጡት ዲፖዛት የማያቋርጥ የ10% ባለድርሻ ይሁኑ.
+ከታች ያለውን ሊንክ ለወዳጆቾ በመጋበዝ ጓደኛዎን ሲጋብዙ 2 ብር ያገኛሉ።
     
 🔗 <a href="${referralLink}">Click Here to Invite</a>
     
