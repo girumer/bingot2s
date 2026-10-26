@@ -63,13 +63,7 @@ referralBonusPaid: {
     type: Boolean,
     default: false,
   },
-  referralCount: {
-  type: Number,
-  default: 0,
-},
-pendingReferrerId: { type: Number, default: null },
 });
-
 
 // Hash password before saving (only for admins)
 BingoBordSchema.pre('save', async function(next) {
