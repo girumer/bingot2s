@@ -63,10 +63,7 @@ referralBonusPaid: {
     type: Boolean,
     default: false,
   },
-referralCount: {
-  type: Number,
-  default: 0,
-},
+
 });
 
 // Hash password before saving (only for admins)

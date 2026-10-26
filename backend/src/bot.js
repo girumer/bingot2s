@@ -738,44 +738,51 @@ bot.on("contact", async (msg) => {
     // ----------------------
     // Referral bonus: +2 Birr to direct referrer, capped at 10 successful invites
     // ----------------------
-   if (state.referrerId) {
-  try {
-    const MAX_REFERRALS = 10;
-
-    // Atomic: increment count only if it's still below the cap
-    const referrer = await BingoBord.findOneAndUpdate(
-      {
-        telegramId: state.referrerId,
-        referralCount: { $lt: MAX_REFERRALS }  // condition embedded in the query
-      },
-      {
-        $inc: { Wallet: 2, referralCount: 1 }   // only runs if condition matched
-      },
-      { new: true }
-    );
-
-    if (!referrer) {
-      console.log(`Referrer ${state.referrerId} is at cap or not found. No bonus paid.`);
-    } else {
-      // Log the transaction
+    if (state.referrerId) {
       try {
-        await Transaction.create({
-          transactionNumber: `REF${new mongoose.Types.ObjectId().toString()}`,
-          phoneNumber: referrer.phoneNumber,
-          method: "referral_bonus",
-          type: "bonus",
-          amount: 2,
-          rawMessage: `Referral bonus for inviting telegramId ${chatId} (invite #${referrer.referralCount})`,
-          status: "completed",
+        const MAX_REFERRALS = 4;
+
+        const previousInvites = await BingoBord.countDocuments({
+          referredBy: state.referrerId,
         });
-      } catch (txErr) {
-        console.error("Referral tx log failed:", txErr.message);
+
+        console.log(
+          `Referrer ${state.referrerId} has ${previousInvites} previous invites (cap: ${MAX_REFERRALS})`
+        );
+
+        if (previousInvites >= MAX_REFERRALS) {
+          console.log(
+            `Referrer ${state.referrerId} reached the ${MAX_REFERRALS}-invite cap. No bonus paid for invite of ${chatId}.`
+          );
+        } else {
+          const referrer = await BingoBord.findOneAndUpdate(
+            { telegramId: state.referrerId },
+            { $inc: { Wallet: 2 } },
+            { new: true }
+          );
+
+          if (referrer) {
+            try {
+              await Transaction.create({
+                transactionNumber: `REF${new mongoose.Types.ObjectId().toString()}`,
+                phoneNumber: referrer.phoneNumber,
+                method: "referral_bonus",
+                type: "bonus",
+                amount: 2,
+                rawMessage: `Referral bonus for inviting telegramId ${chatId} (invite #${previousInvites + 1})`,
+                status: "completed",
+              });
+            } catch (txErr) {
+              console.error("Referral tx log failed:", txErr.message);
+            }
+          } else {
+            console.error(`Referrer not found: ${state.referrerId}`);
+          }
+        }
+      } catch (bonusErr) {
+        console.error("Referral bonus error:", bonusErr);
       }
     }
-  } catch (bonusErr) {
-    console.error("Referral bonus error:", bonusErr);
-  }
-}
 
     delete userStates[chatId];
     bot.sendMessage(chatId, "✅ Registration complete! 🎉", mainMenu);
