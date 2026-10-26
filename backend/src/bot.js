@@ -779,7 +779,7 @@ bot.on("contact", async (msg) => {
     // ----------------------
     if (referrerId) {
       try {
-        const MAX_REFERRALS = 10;
+        const MAX_REFERRALS = 2;
 
         // Count users that ACTUALLY have this referrer AND are past placeholder stage
         const previousInvites = await BingoBord.countDocuments({
