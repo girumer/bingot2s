@@ -1081,7 +1081,7 @@ const captionText = `
     
 እየተዝናን አብረን  እንስራ
 `;
-bot.sendPhoto(chatId, botProfilePictureId, { caption: captionText, parse_mode: 'HTML' });
+//bot.sendPhoto(chatId, botProfilePictureId, { caption: captionText, parse_mode: 'HTML' });
     
     
     break;
