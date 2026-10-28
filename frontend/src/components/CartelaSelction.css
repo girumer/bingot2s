@@ -194,7 +194,7 @@
   border: 1px solid #333;
   border-radius: 5px;
   font-weight: bold;
-  background-color: #d3c6b794;
+  background-color: rgba(225, 247, 247, 0.533); 
   color: black;
   cursor: default;
   transition: background-color 0.3s, color 0.3s;
