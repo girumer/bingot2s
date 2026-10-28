@@ -243,18 +243,39 @@ bot.onText(/\/(balance|play|deposit|history|help|withdraw|coins)/, async (msg, m
   
         bot.sendMessage(chatId, historyText);
         break;
-      case "play":
-        bot.sendMessage(chatId, "Select a room to play:", {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "Room 7 (Stake 7)", callback_data: "room_7" },
-                { text: "Room 10 (Stake 10)", callback_data: "room_10" },
-              ]
-            ]
-          }
-        });
-        break;
+    case "play":
+  if (user.Wallet < 7) {
+    bot.sendMessage(chatId, `⚠️ Not enough Birr. Your balance: ${user.Wallet} ETB`);
+    return;
+  }
+  bot.sendMessage(
+    chatId,
+    `🎮 <b>Choose your stake and start playing!</b>\n\n💰 Your balance: <b>${user.Wallet} ETB</b>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "▶️ Play 7 ETB",
+              web_app: {
+                url: `${process.env.FRONTEND_URL}/CartelaSelction?roomId=7`
+              }
+            }
+          ],
+          [
+            {
+              text: "▶️ Play 10 ETB",
+              web_app: {
+                url: `${process.env.FRONTEND_URL}/CartelaSelction?roomId=10`
+              }
+            }
+          ]
+        ]
+      }
+    }
+  );
+  break;
         // Case for when the user selects 'Play Bingo' from the main menu
 // ... existing switch cases ...
 
@@ -841,19 +862,41 @@ bot.on('callback_query', async (callbackQuery) => {
       bot.sendMessage(chatId, historyText);
       break;
 
-    case "play":
-      bot.sendMessage(chatId, "Select a room to play:", {
-        reply_markup: {
-        
+  case "play": 
+  bot.answerCallbackQuery(callbackQuery.id);
+  if (user.Wallet < 7) {
+    bot.sendMessage(chatId, `⚠️ Not enough Birr. Your balance: ${user.Wallet} ETB`);
+    return;
+  }
+  bot.sendMessage(
+    chatId,
+    `🎮 <b>Choose your stake and start playing!</b>\n\n💰 Your balance: <b>${user.Wallet} ETB</b>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
         inline_keyboard: [
-  [
-    { text: "Room 7 (Stake 7)", callback_data: "room_7" },
-    { text: "Room 10 (Stake 10)", callback_data: "room_10" },]
-]
-
-        }
-      });
-      break;
+          [
+            {
+              text: "▶️ Play 7 ETB",
+              web_app: {
+                url: `${process.env.FRONTEND_URL}/CartelaSelction?roomId=7`
+              }
+            }
+          ],
+          [
+            {
+              text: "▶️ Play 10 ETB",
+              web_app: {
+                url: `${process.env.FRONTEND_URL}/CartelaSelction?roomId=10`
+              }
+            }
+          ]
+        ]
+      }
+    }
+  );
+  
+  break;
  case "spin_game":
   // ✅ Acknowledge the button click
   bot.sendMessage(chatId, "Select your bet amount for Spin & Win:", {
@@ -1013,34 +1056,7 @@ New balances:
         answerQuery("❌ Transfer failed due to a database error.", true);
       }
       break;
-case "room_7":
-case "room_10":
 
-  const stake = parseInt(data.split("_")[1]);
-  if (user.Wallet < stake) {
-    bot.sendMessage(chatId, "⚠️ Not enough birr. Earn more to play.");
-    return;
-  }
-
-  
-  await user.save();
-
- // const webAppUrl = `${process.env.FRONTEND_URL}/CartelaSelction?username=${encodeURIComponent(user.username)}&telegramId=${user.telegramId}&roomId=${stake}&stake=${stake}`;
-  //const webAppUrl = `${process.env.FRONTEND_URL}/CartelaSelction`;   // clean URL
-  const webAppUrl = `${process.env.FRONTEND_URL}/CartelaSelction?roomId=${stake}`;
-  // ✅ Corrected Markdown: Added a closing *
-  bot.sendMessage(chatId, `🎮 <i>play ${stake} ETB</i>`, {
-   parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [{
-          text: "🚀 PLAY NOW", 
-          web_app: { url: webAppUrl }
-        }]
-      ]
-    }
-  });
-  break;
  case "spin_5":
 
   bot.answerCallbackQuery(callbackQuery.id); // ✅ Acknowledge the button click
