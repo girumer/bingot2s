@@ -408,7 +408,7 @@ const refreshpg = () => {
                 onClick={() => handleButtonClick(index)}
                 className="cartela"
                 style={{
-                  background: isSelectedByOthers ? "#f52622" : isSelectedByMe ? "green" : "#d3c6b794",
+                  background: isSelectedByOthers ? "#f52622" : isSelectedByMe ? "green" : "rgba(225, 247, 247, 0.533)",
                   color: isSelectedByOthers || isSelectedByMe ? "white" : "black",
                   cursor: isSelectedByOthers || activeGame ? "not-allowed" : "pointer",
                 }}
