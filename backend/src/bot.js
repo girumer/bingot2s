@@ -261,9 +261,8 @@ bot.onText(/\/(balance|play|deposit|history|help|withdraw|coins)/, async (msg, m
               web_app: {
                 url: `${process.env.FRONTEND_URL}/CartelaSelction?roomId=7`
               }
-            }
-          ],
-          [
+            },
+          
             {
               text: "▶️ Play 10 ETB",
               web_app: {
@@ -881,16 +880,17 @@ bot.on('callback_query', async (callbackQuery) => {
               web_app: {
                 url: `${process.env.FRONTEND_URL}/CartelaSelction?roomId=7`
               }
-            }
-          ],
-          [
+            },
+          
+          
             {
               text: "▶️ Play 10 ETB",
               web_app: {
                 url: `${process.env.FRONTEND_URL}/CartelaSelction?roomId=10`
               }
             }
-          ]
+          
+        ]
         ]
       }
     }
