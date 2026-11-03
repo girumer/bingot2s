@@ -155,14 +155,58 @@ router.get('/myteam', async (req, res) => {
 
 // --- 7. Full bootstrap data (cached) ---
 // GET /api/fpl/bootstrap
+// --- 7. Full bootstrap data (cached & formatted) ---
+// GET /api/fpl/bootstrap
 router.get('/bootstrap', async (req, res) => {
   try {
-    const data = await getBootstrap();
-    res.json(data);
+    const rawData = await getBootstrap();
+    
+    // Create a map of Team IDs to Team Names (e.g., 1 -> "Arsenal")
+    const teamMap = {};
+    rawData.teams.forEach(t => { teamMap[t.id] = t.name; });
+
+    // Format players for the frontend
+    const players = rawData.elements.map(p => ({
+      id: p.id,
+      name: p.web_name,
+      team: teamMap[p.team], // e.g., "Brighton"
+      teamCode: p.team,
+      position: p.element_type, // 1=GK, 2=DEF, 3=MID, 4=FWD
+      price: p.now_cost / 10, // e.g., 4.6
+      totalPoints: p.total_points,
+      photo: `https://resources.premierleague.com/premierleague/photos/players/110x140/p${p.code}.png` // Real FPL Photos!
+    }));
+
+    res.json({
+      currentGw: rawData.events.find(e => e.is_current)?.id || 1,
+      players
+    });
   } catch (err) {
     console.error('FPL bootstrap error:', err.message);
     res.status(500).json({ error: 'FPL API unavailable' });
   }
 });
+// --- 8. Save User's FPL Squad ---
+// POST /api/fpl/save-squad { telegramId, squadIds }
+router.post('/save-squad', async (req, res) => {
+  try {
+    const { telegramId, squadIds } = req.body;
+    if (!telegramId || !squadIds || !Array.isArray(squadIds)) {
+      return res.status(400).json({ error: 'telegramId and squadIds array required' });
+    }
 
+    const BingoBord = require('../Models/BingoBord');
+    
+    // Save the array of 15 player IDs into the user's document
+    await BingoBord.updateOne(
+      { telegramId: Number(telegramId) },
+      { $set: { fplSquad: squadIds } }
+    );
+
+    res.json({ success: true, message: 'Squad saved successfully' });
+  } catch (err) {
+    console.error('FPL save squad error:', err.message);
+    res.status(500).json({ error: 'Could not save squad' });
+  }
+});
 module.exports = router;

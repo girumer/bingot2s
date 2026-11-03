@@ -1,293 +1,242 @@
-// components/FplDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || '';
+  
+// Helper to get colors for positions
+const getPosStyle = (pos) => {
+  if (pos === 1) return { bg: '#f39c12', text: 'GK' }; // Orange
+  if (pos === 2) return { bg: '#2ecc71', text: 'DEF' }; // Green
+  if (pos === 3) return { bg: '#3498db', text: 'MID' }; // Blue
+  return { bg: '#e74c3c', text: 'FWD' }; // Red
+};
 
 export default function FplDashboard() {
-  const [auth, setAuth] = useState(null);
-  const [teamId, setTeamId] = useState('');
-  const [team, setTeam] = useState(null);
-  const [leagueId, setLeagueId] = useState('');
-  const [league, setLeague] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [myTeam, setMyTeam] = useState(null);
-  const [picks, setPicks] = useState(null);
-  const [gw, setGw] = useState(null);
-  const [picksTeamId, setPicksTeamId] = useState('');
-
-  // --- 1. Authenticate with Telegram initData ---
-  useEffect(() => {
+  const [players, setPlayers] = useState([]);
+  const [mySquad, setMySquad] = useState([]); // Array of selected player IDs
+  const [filterPos, setFilterPos] = useState(0); // 0=ALL, 1=GK, 2=DEF, 3=MID, 4=FWD
+  const [loading, setLoading] = useState(true);
+  const [tgId, setTgId] = useState(null);
+  // 1. Fetch Players on Load
+   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
-    if (!initData) {
-      setAuth({ error: 'Open this page from the Telegram bot.' });
-      return;
+    
+    if (initData) {
+      try {
+        // Extract Telegram ID from the WebApp data
+        const urlParams = new URLSearchParams(initData);
+        const user = JSON.parse(urlParams.get('user'));
+        setTgId(user.id);
+      } catch (e) {
+        console.error("Could not parse Telegram user data", e);
+      }
     }
 
-    axios.post(`${API_BASE}/api/verify-init-data`, { initData })
-      .then(res => setAuth({ user: res.data.user }))
-      .catch(() => setAuth({ error: 'Authentication failed' }));
-  }, []);
-
-  // --- 2. Auto-detect current gameweek from bootstrap ---
-  useEffect(() => {
-    if (!auth?.user) return;
+    // Fetch players
     axios.get(`${API_BASE}/api/fpl/bootstrap`)
       .then(res => {
-        const current = res.data.events?.find(e => e.is_current) ||
-                        res.data.events?.find(e => e.is_next) ||
-                        res.data.events?.[0];
-        if (current) setGw(current.id);
+        setPlayers(res.data.players);
+        setLoading(false);
       })
-      .catch(() => setGw(1));
-  }, [auth]);
-
-  // --- 3. Load my bound team (if any) ---
-  useEffect(() => {
-    if (!auth?.user) return;
-    axios.get(`${API_BASE}/api/fpl/myteam?telegramId=${auth.user.telegramId}`)
-      .then(res => {
-        if (res.data && res.data.teamId) setMyTeam(res.data);
-      })
-      .catch(() => {});
-  }, [auth]);
-
-  // --- 4. Public: load any team by ID ---
-  const loadTeam = async () => {
-    if (!teamId) return;
-    setLoading(true);
-    try {
-      const res = await axios.get(`${API_BASE}/api/fpl/team/${teamId}`);
-      setTeam(res.data);
-    } catch (e) {
-      setTeam({ error: 'Failed to load team' });
-    }
-    setLoading(false);
-  };
-
-  // --- 5. Public: load league standings ---
-  const loadLeague = async () => {
-    if (!leagueId) return;
-    setLoading(true);
-    try {
-      const res = await axios.get(`${API_BASE}/api/fpl/league/${leagueId}`);
-      setLeague(res.data);
-    } catch (e) {
-      setLeague({ error: 'Failed to load league' });
-    }
-    setLoading(false);
-  };
-
-  // --- 6. Load squad picks ---
-  const loadPicks = async () => {
-    if (!picksTeamId || !gw) return;
-    setLoading(true);
-    try {
-      const picksRes = await axios.get(`${API_BASE}/api/fpl/picks/${picksTeamId}/${gw}`);
-      const bootstrapRes = await axios.get(`${API_BASE}/api/fpl/bootstrap`);
-      const playerMap = {};
-      bootstrapRes.data.elements.forEach(p => {
-        playerMap[p.id] = p;
+      .catch(err => {
+        console.error(err);
+        alert("Failed to load players");
+        setLoading(false);
       });
+  }, []);
 
-      const squad = picksRes.data.picks.map(pick => ({
-        ...pick,
-        player: playerMap[pick.element]
-      }));
+  // 2. Calculate Budget & Positions
+  const budget = 100.0;
+  const spent = mySquad.reduce((sum, id) => {
+    const p = players.find(x => x.id === id);
+    return sum + (p ? p.price : 0);
+  }, 0);
+  const remainingBudget = (budget - spent).toFixed(1);
 
-      setPicks(squad);
-    } catch (e) {
-      console.error('loadPicks failed:', e.response?.status, e.response?.data);
-      alert(`Failed to load picks (${e.response?.status || e.message}). Check Team ID and Gameweek.`);
-    }
-    setLoading(false);
+  const getPosCount = (posType) => {
+    return mySquad.filter(id => {
+      const p = players.find(x => x.id === id);
+      return p && p.position === posType;
+    }).length;
   };
 
-  // --- 7. Bind this Telegram user to an FPL team ---
-  const bindTeam = async () => {
-    if (!teamId || !auth?.user) return;
+  const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 }; // GK, DEF, MID, FWD
+
+  // 3. Toggle Player Selection
+  const togglePlayer = (player) => {
+    const isSelected = mySquad.includes(player.id);
+
+    if (isSelected) {
+      // Remove from squad
+      setMySquad(mySquad.filter(id => id !== player.id));
+    } else {
+      // Add to squad (Check rules)
+      if (mySquad.length >= 15) return alert("Squad is full (15 players).");
+      if (getPosCount(player.position) >= posLimits[player.position]) {
+        return alert(`You can only pick ${posLimits[player.position]} players for this position.`);
+      }
+      if (spent + player.price > budget) {
+        return alert("Not enough budget!");
+      }
+      setMySquad([...mySquad, player.id]);
+    }
+  };
+
+  // 4. Filter Players
+  const filteredPlayers = players.filter(p => filterPos === 0 || p.position === filterPos);
+
+  if (loading) return <div style={{ padding: 20, color: 'white' }}>Loading players...</div>;
+  const handleSave = async () => {
+    if (mySquad.length !== 15) {
+      return alert(`You must pick exactly 15 players. You currently have ${mySquad.length}.`);
+    }
+    if (!tgId) {
+      return alert("Could not authenticate Telegram user.");
+    }
+
     try {
-      await axios.post(`${API_BASE}/api/fpl/bind`, {
-        teamId: Number(teamId),
-        telegramId: auth.user.telegramId
+      await axios.post(`${API_BASE}/api/fpl/save-squad`, {
+        telegramId: tgId,
+        squadIds: mySquad
       });
-      const res = await axios.get(`${API_BASE}/api/fpl/myteam?telegramId=${auth.user.telegramId}`);
-      setMyTeam(res.data);
-    } catch (e) {
-      alert('Could not bind team. Check the ID and try again.');
+      
+      // Show success using Telegram's native UI if available, otherwise standard alert
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram.WebApp.showAlert("Squad saved successfully! ✅");
+      } else {
+        alert("Squad saved successfully! ✅");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save squad. Please try again.");
     }
   };
-
-  if (auth?.error) {
-    return <div style={styles.container}><p style={{ color: 'red' }}>{auth.error}</p></div>;
-  }
-  if (!auth) return <div style={styles.container}>Authenticating...</div>;
-
   return (
-    <div style={styles.container}>
-      <h2>⚽ Fantasy Premier League</h2>
-      <p style={{ color: '#666' }}>Logged in as <b>{auth.user.username}</b></p>
-
-      {/* My Team section */}
-      {myTeam && (
-        <div style={styles.card}>
-          <h3>My FPL Team</h3>
-          <p><b>{myTeam.name}</b></p>
-          <p>Overall Rank: #{myTeam.overallRank}</p>
-          <p>Total Points: {myTeam.overallPoints}</p>
+    <div style={styles.appContainer}>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18 }}>My Squad</h2>
+          <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>
+            {mySquad.length}/15 · Budget: {remainingBudget} ETB left
+          </p>
         </div>
-      )}
-
-      {/* Bind a team */}
-      <div style={styles.card}>
-        <h3>{myTeam ? 'Change FPL Team' : 'Link Your FPL Team'}</h3>
-        <p style={{ fontSize: 12, color: '#666' }}>
-          Find your Team ID in the URL on fantasy.premierleague.com — e.g. .../entry/<b>123456</b>/event/1
-        </p>
-        <input
-          style={styles.input}
-          value={teamId}
-          onChange={e => setTeamId(e.target.value)}
-          placeholder="Enter FPL Team ID"
-        />
-        <button style={styles.button} onClick={bindTeam} disabled={!teamId}>
-          {myTeam ? 'Update Team' : 'Link Team'}
-        </button>
+        <button style={styles.saveBtn} onClick={handleSave}>Save</button>
       </div>
 
-      {/* Look up any team */}
-      <div style={styles.card}>
-        <h3>Look Up Any Team</h3>
-        <input
-          style={styles.input}
-          value={teamId}
-          onChange={e => setTeamId(e.target.value)}
-          placeholder="Team ID"
-        />
-        <button style={styles.button} onClick={loadTeam} disabled={!teamId || loading}>
-          {loading ? 'Loading...' : 'Load Team'}
-        </button>
-        {team && !team.error && (
-          <div style={{ marginTop: 10 }}>
-            <p><b>{team.name}</b></p>
-            <p>Rank: #{team.summary_overall_rank}</p>
-            <p>Points: {team.summary_overall_points}</p>
-          </div>
-        )}
-        {team?.error && <p style={{ color: 'red' }}>{team.error}</p>}
+      {/* CONTROLS */}
+      <div style={styles.controls}>
+        <button style={styles.pickBtn}>⚽ Pick Players ({mySquad.length}/15)</button>
+        <div style={{ color: '#aaa', fontSize: 14 }}>👑 Captain</div>
+      </div>{/*  */}
+
+      {/* POSITION COUNTERS */}
+      <div style={styles.posCounters}>
+        {[1, 2, 3, 4].map(pos => {
+          const style = getPosStyle(pos);
+          return (
+            <div key={pos} style={{ textAlign: 'center' }}>
+              <div style={{ color: '#ccc', fontSize: 12, fontWeight: 'bold' }}>{style.text}</div>
+              <div style={{ color: getPosCount(pos) >= posLimits[pos] ? style.bg : '#fff', fontSize: 14 }}>
+                {getPosCount(pos)}/{posLimits[pos]}
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+          <button style={styles.actionBtn} onClick={() => setMySquad([])}>Reset</button>
+          <button style={styles.actionBtn}>Auto</button>
+        </div>
       </div>
 
-      {/* League standings */}
-      <div style={styles.card}>
-        <h3>League Standings</h3>
-        <input
-          style={styles.input}
-          value={leagueId}
-          onChange={e => setLeagueId(e.target.value)}
-          placeholder="League ID"
-        />
-        <button style={styles.button} onClick={loadLeague} disabled={!leagueId || loading}>
-          {loading ? 'Loading...' : 'Load League'}
-        </button>
-        {league && !league.error && league.standings && (
-          <div style={{ marginTop: 10 }}>
-            <h4>{league.league?.name}</h4>
-            <table style={styles.table}>
-              <thead>
-                <tr><th>#</th><th>Team</th><th>Points</th></tr>
-              </thead>
-              <tbody>
-                {league.standings.results.slice(0, 20).map((row, i) => (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td>{row.entry_name}</td>
-                    <td>{row.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {league?.error && <p style={{ color: 'red' }}>{league.error}</p>}
+      {/* FILTERS */}
+      <div style={styles.filters}>
+        {['ALL', 'GK', 'DEF', 'MID', 'FWD'].map((label, idx) => (
+          <button
+            key={label}
+            style={filterPos === idx ? styles.filterBtnActive : styles.filterBtn}
+            onClick={() => setFilterPos(idx)}
+          >
+            {label}
+          </button>
+        ))}
+        <select style={styles.dropdown}>
+          <option>All Clubs</option>
+        </select>
       </div>
 
-      {/* View Squad (picks) */}
-      <div style={styles.card}>
-        <h3>View Team Squad</h3>
-        <p style={{ fontSize: 12, color: '#666' }}>
-          Enter a Team ID to see that manager's 15 players. Current gameweek: <b>{gw || '...'}</b>
-        </p>
-        <input
-          style={styles.input}
-          value={picksTeamId}
-          onChange={e => setPicksTeamId(e.target.value)}
-          placeholder="Team ID"
-        />
-        <input
-          style={styles.input}
-          type="number"
-          min="1"
-          max="38"
-          value={gw || ''}
-          onChange={e => setGw(Number(e.target.value))}
-          placeholder="Gameweek (1-38)"
-        />
-        <button
-          style={styles.button}
-          onClick={loadPicks}
-          disabled={!picksTeamId || !gw || loading}
-        >
-          {loading ? 'Loading...' : 'Load Squad'}
-        </button>
+      {/* PLAYER LIST */}
+      <div style={styles.playerList}>
+        {filteredPlayers.map(player => {
+          const isSelected = mySquad.includes(player.id);
+          const posStyle = getPosStyle(player.position);
+          
+          return (
+            <div 
+              key={player.id} 
+              style={isSelected ? styles.playerRowSelected : styles.playerRow}
+              onClick={() => togglePlayer(player)}
+            >
+              {/* Left: Photo & Position */}
+            {/* Left: Photo & Position */}
+<div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+  <div style={{ position: 'relative', width: 40, height: 40 }}>
+    {/* Player Photo */}
+    <img 
+      src={player.photo} 
+      alt={player.name}
+      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: '#2c3547' }}
+      onError={(e) => { e.target.style.display = 'none'; }} // Hide if no photo
+    />
+    {/* Position Badge overlaying the photo */}
+    <div style={{ 
+      position: 'absolute', bottom: -2, right: -2, 
+      background: posStyle.bg, color: 'white', 
+      fontSize: 9, fontWeight: 'bold', 
+      padding: '2px 4px', borderRadius: 4,
+      border: '2px solid #1a1f2b'
+    }}>
+      {posStyle.text}
+    </div>
+  </div>
+  <div>
+    <div style={{ color: 'white', fontWeight: 'bold', fontSize: 15 }}>{player.name}</div>
+    <div style={{ color: '#888', fontSize: 13 }}>{player.team}</div>
+  </div>
+</div>
 
-        {picks && (
-          <div style={{ marginTop: 15 }}>
-            <h4>Starting XI</h4>
-            <ul style={styles.playerList}>
-              {picks.slice(0, 11).map(p => (
-                <li key={p.element} style={styles.playerItem}>
-                  <span>
-                    {p.player?.web_name || `Player #${p.element}`}
-                    {p.is_captain && ' (C)'}
-                    {p.is_vice_captain && ' (V)'}
-                  </span>
-                  <span style={{ color: '#666' }}>
-                    {p.player ? `${p.player.total_points} pts` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-            <h4>Bench</h4>
-            <ul style={styles.playerList}>
-              {picks.slice(11, 15).map(p => (
-                <li key={p.element} style={styles.playerItem}>
-                  <span>{p.player?.web_name || `Player #${p.element}`}</span>
-                  <span style={{ color: '#666' }}>
-                    {p.player ? `${p.player.total_points} pts` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+              {/* Right: Points, Price, Checkmark */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+                <div style={{ color: '#f1c40f', fontSize: 13 }}>★ {player.totalPoints}</div>
+                <div style={{ color: '#2ecc71', fontSize: 14, fontWeight: 'bold' }}>{player.price}</div>
+                <div style={{ 
+                  width: 20, height: 20, borderRadius: '50%', 
+                  border: isSelected ? '6px solid #2ecc71' : '2px solid #555',
+                  background: isSelected ? '#2ecc71' : 'transparent'
+                }}></div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
+// --- DARK THEME STYLES (Matching your screenshot) ---
 const styles = {
-  container: { padding: 20, maxWidth: 600, margin: '0 auto', fontFamily: 'sans-serif' },
-  card: { background: '#fff', borderRadius: 10, padding: 15, marginBottom: 15, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' },
-  input: { width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc', marginBottom: 8, boxSizing: 'border-box' },
-  button: { padding: '10px 20px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 14 },
-  playerList: { listStyle: 'none', padding: 0, margin: '8px 0' },
-  playerItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '6px 0',
-    borderBottom: '1px solid #eee',
-    fontSize: 14
-  },
+  appContainer: { background: '#1a1f2b', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', borderBottom: '1px solid #2c3547' },
+  saveBtn: { background: '#1e4d40', color: '#2ecc71', border: '1px solid #2ecc71', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
+  controls: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px' },
+  pickBtn: { background: '#1e4d40', color: '#2ecc71', border: '1px solid #2ecc71', padding: '10px 15px', borderRadius: 8, flex: 1, marginRight: 15, fontWeight: 'bold' },
+  posCounters: { display: 'flex', gap: 20, padding: '10px 15px', background: '#212736', borderBottom: '1px solid #2c3547' },
+  actionBtn: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 12px', borderRadius: 6 },
+  filters: { display: 'flex', gap: 8, padding: '10px 15px', overflowX: 'auto' },
+  filterBtn: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
+  filterBtnActive: { background: '#2ecc71', color: 'white', border: 'none', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
+  dropdown: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 10px', borderRadius: 6, marginLeft: 'auto' },
+  playerList: { paddingBottom: 60 }, // space for bottom nav
+  playerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderBottom: '1px solid #212736', cursor: 'pointer' },
+  playerRowSelected: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderBottom: '1px solid #212736', background: '#2c3547', cursor: 'pointer' }
 };
