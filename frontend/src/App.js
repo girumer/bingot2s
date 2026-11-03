@@ -3,8 +3,10 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import socket from "./socket";
 import "react-toastify/dist/ReactToastify.css";
+
 import Mainmenu from "./components/Mainmenu";
 import GameHistory from "./components/Gamehistory";
+import FplDashboard from './components/FplDashboard';
 import Helpdesk from "./components/Helpdesk";
 import BingoBoard from "./components/BingoBoard";
 import CartelaSelction from "./components/CartelaSelction";
@@ -65,6 +67,7 @@ function App() {
           <Route path="/SpinnerSelection" element={<SpinnerSelection />} />
           <Route path="/BingoBoard" element={<BingoBoard />} />
           <Route path="/TopUsers" element={<TopUsers />} />
+          <Route path="/FplDashboard" element={<FplDashboard />} /> 
 
           {/* Protected user routes (require token) */}
           <Route element={<ProtectedRoute />}>

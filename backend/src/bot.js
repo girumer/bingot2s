@@ -155,7 +155,10 @@ const mainMenu = {
 [ 
    { text: "🏆 Leaders board", callback_data: "top" },
           { text: "🪙 Convert Coins", callback_data: "transfer_coins_to_wallet" }, // <-- NEW BUTTON
-      ]
+      ],
+      [
+        { text: "⚽ Fantasy Premier League", callback_data: "fpl" },  // ← NEW ROW
+      ]
     ]
   }
 };
@@ -1161,6 +1164,23 @@ case "referral":
             }
         });
         break;
+        case "fpl":
+    const fplUrl = `${process.env.FRONTEND_URL}/FplDashboard`;
+
+    bot.sendMessage(chatId, `⚽ <i>Fantasy Premier League</i>\n\nTrack your FPL team, compare with friends, and climb the ranks!`, {
+        parse_mode: "HTML",
+        reply_markup: {
+            inline_keyboard: [
+                [{
+                    text: "🏆 Open FPL Dashboard",
+                    web_app: { url: fplUrl }
+                }]
+            ]
+        }
+    });
+
+    answerQuery("", false);   // acknowledge the button tap
+    break;
     
     default:
       bot.sendMessage(chatId, "Unknown action occured.");

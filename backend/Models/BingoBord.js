@@ -67,6 +67,8 @@ referralCount: {
   type: Number,
   default: 0,
 },
+fplTeamId:   { type: Number, default: null },
+fplTeamName: { type: String, default: null },
 });
 
 // Hash password before saving (only for admins)

@@ -2,6 +2,7 @@
 
 const express = require("express")
 const async = require('async');
+
 const cartela = require('./cartela.json');
 const BingoBord=require("../Models/BingoBord")
 const crypto = require('crypto');
@@ -16,6 +17,7 @@ const authRoutes = require('../routes/authRoutes');
 const leaderboardRoutes = require("../routes/leaderboardRoutes");
 
 const adminsRoutes = require("../routes/admins");
+const fplRoutes = require('../routes/fpl');
 const userRoutes = require('../routes/userRoutes');
 const walletRoutes = require("../routes/walletRoutes");
 const alluserRoutes = require('../routes/alluserRoutes');
@@ -1290,7 +1292,7 @@ app.post("/api/verify-init-data", async (req, res) => {
 app.use("/api", leaderboardRoutes);
   app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
-
+app.use('/api/fpl', fplRoutes);
 app.use('/api', reportRoutes);
 app.use('/auth', authRoutessignup);
 app.use('/api', gameHistoryRoutes);
