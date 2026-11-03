@@ -52,6 +52,8 @@ router.get('/team/:teamId', async (req, res) => {
 router.get('/picks/:teamId/:gw', async (req, res) => {
   try {
     const { teamId, gw } = req.params;
+    // NOTE: If this throws "fetchEntryEvent is not a function",
+    // change to fpl.fetchEntryPicks(teamId, Number(gw))
     const data = await fpl.fetchEntryEvent(teamId, Number(gw));
     res.json(data);
   } catch (err) {
@@ -102,15 +104,14 @@ router.get('/player', async (req, res) => {
   }
 });
 
-// --- 5. Authenticated: bind FPL team ID to a user ---
-// POST /api/fpl/bind  { teamId }
+// --- 5. Bind FPL team ID to a Telegram user ---
 // POST /api/fpl/bind  { teamId, telegramId }
 router.post('/bind', async (req, res) => {
   try {
     const { teamId, telegramId } = req.body;
     if (!teamId || !telegramId) return res.status(400).json({ error: 'teamId and telegramId required' });
 
-    const entry = await fpl.fetchEntry(teamId);   // validates the team exists
+    const entry = await fpl.fetchEntry(teamId);
 
     const BingoBord = require('../Models/BingoBord');
     await BingoBord.updateOne(
@@ -125,8 +126,7 @@ router.post('/bind', async (req, res) => {
   }
 });
 
-// --- 6. Authenticated: get my FPL team ---
-// GET /api/fpl/myteam
+// --- 6. Get my FPL team (by telegramId) ---
 // GET /api/fpl/myteam?telegramId=XXX
 router.get('/myteam', async (req, res) => {
   try {
@@ -149,6 +149,18 @@ router.get('/myteam', async (req, res) => {
     });
   } catch (err) {
     console.error('FPL myteam error:', err.message);
+    res.status(500).json({ error: 'FPL API unavailable' });
+  }
+});
+
+// --- 7. Full bootstrap data (cached) ---
+// GET /api/fpl/bootstrap
+router.get('/bootstrap', async (req, res) => {
+  try {
+    const data = await getBootstrap();
+    res.json(data);
+  } catch (err) {
+    console.error('FPL bootstrap error:', err.message);
     res.status(500).json({ error: 'FPL API unavailable' });
   }
 });

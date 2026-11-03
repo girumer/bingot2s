@@ -12,6 +12,9 @@ export default function FplDashboard() {
   const [league, setLeague] = useState(null);
   const [loading, setLoading] = useState(false);
   const [myTeam, setMyTeam] = useState(null);
+  const [picks, setPicks] = useState(null);
+  const [gw, setGw] = useState(null);
+  const [picksTeamId, setPicksTeamId] = useState('');
 
   // --- 1. Authenticate with Telegram initData ---
   useEffect(() => {
@@ -26,20 +29,30 @@ export default function FplDashboard() {
       .catch(() => setAuth({ error: 'Authentication failed' }));
   }, []);
 
-  // --- 2. Load my bound team (if any) ---
+  // --- 2. Auto-detect current gameweek from bootstrap ---
   useEffect(() => {
     if (!auth?.user) return;
-    // We need a JWT for the /myteam endpoint. But in Telegram WebApp context
-    // we don't have a JWT — so use a public fetch with telegramId instead.
-    // See Step 5 (backend tweak) below.
+    axios.get(`${API_BASE}/api/fpl/bootstrap`)
+      .then(res => {
+        const current = res.data.events?.find(e => e.is_current) ||
+                        res.data.events?.find(e => e.is_next) ||
+                        res.data.events?.[0];
+        if (current) setGw(current.id);
+      })
+      .catch(() => setGw(1));
+  }, [auth]);
+
+  // --- 3. Load my bound team (if any) ---
+  useEffect(() => {
+    if (!auth?.user) return;
     axios.get(`${API_BASE}/api/fpl/myteam?telegramId=${auth.user.telegramId}`)
       .then(res => {
         if (res.data && res.data.teamId) setMyTeam(res.data);
       })
-      .catch(() => {}); // 404 = no team bound yet, that's fine
+      .catch(() => {});
   }, [auth]);
 
-  // --- 3. Public: load any team by ID ---
+  // --- 4. Public: load any team by ID ---
   const loadTeam = async () => {
     if (!teamId) return;
     setLoading(true);
@@ -52,7 +65,7 @@ export default function FplDashboard() {
     setLoading(false);
   };
 
-  // --- 4. Public: load league standings ---
+  // --- 5. Public: load league standings ---
   const loadLeague = async () => {
     if (!leagueId) return;
     setLoading(true);
@@ -65,7 +78,32 @@ export default function FplDashboard() {
     setLoading(false);
   };
 
-  // --- 5. Bind this Telegram user to an FPL team ---
+  // --- 6. Load squad picks ---
+  const loadPicks = async () => {
+    if (!picksTeamId || !gw) return;
+    setLoading(true);
+    try {
+      const picksRes = await axios.get(`${API_BASE}/api/fpl/picks/${picksTeamId}/${gw}`);
+      const bootstrapRes = await axios.get(`${API_BASE}/api/fpl/bootstrap`);
+      const playerMap = {};
+      bootstrapRes.data.elements.forEach(p => {
+        playerMap[p.id] = p;
+      });
+
+      const squad = picksRes.data.picks.map(pick => ({
+        ...pick,
+        player: playerMap[pick.element]
+      }));
+
+      setPicks(squad);
+    } catch (e) {
+      console.error('loadPicks failed:', e.response?.status, e.response?.data);
+      alert(`Failed to load picks (${e.response?.status || e.message}). Check Team ID and Gameweek.`);
+    }
+    setLoading(false);
+  };
+
+  // --- 7. Bind this Telegram user to an FPL team ---
   const bindTeam = async () => {
     if (!teamId || !auth?.user) return;
     try {
@@ -172,6 +210,68 @@ export default function FplDashboard() {
         )}
         {league?.error && <p style={{ color: 'red' }}>{league.error}</p>}
       </div>
+
+      {/* View Squad (picks) */}
+      <div style={styles.card}>
+        <h3>View Team Squad</h3>
+        <p style={{ fontSize: 12, color: '#666' }}>
+          Enter a Team ID to see that manager's 15 players. Current gameweek: <b>{gw || '...'}</b>
+        </p>
+        <input
+          style={styles.input}
+          value={picksTeamId}
+          onChange={e => setPicksTeamId(e.target.value)}
+          placeholder="Team ID"
+        />
+        <input
+          style={styles.input}
+          type="number"
+          min="1"
+          max="38"
+          value={gw || ''}
+          onChange={e => setGw(Number(e.target.value))}
+          placeholder="Gameweek (1-38)"
+        />
+        <button
+          style={styles.button}
+          onClick={loadPicks}
+          disabled={!picksTeamId || !gw || loading}
+        >
+          {loading ? 'Loading...' : 'Load Squad'}
+        </button>
+
+        {picks && (
+          <div style={{ marginTop: 15 }}>
+            <h4>Starting XI</h4>
+            <ul style={styles.playerList}>
+              {picks.slice(0, 11).map(p => (
+                <li key={p.element} style={styles.playerItem}>
+                  <span>
+                    {p.player?.web_name || `Player #${p.element}`}
+                    {p.is_captain && ' (C)'}
+                    {p.is_vice_captain && ' (V)'}
+                  </span>
+                  <span style={{ color: '#666' }}>
+                    {p.player ? `${p.player.total_points} pts` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <h4>Bench</h4>
+            <ul style={styles.playerList}>
+              {picks.slice(11, 15).map(p => (
+                <li key={p.element} style={styles.playerItem}>
+                  <span>{p.player?.web_name || `Player #${p.element}`}</span>
+                  <span style={{ color: '#666' }}>
+                    {p.player ? `${p.player.total_points} pts` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -182,4 +282,12 @@ const styles = {
   input: { width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc', marginBottom: 8, boxSizing: 'border-box' },
   button: { padding: '10px 20px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 14 },
+  playerList: { listStyle: 'none', padding: 0, margin: '8px 0' },
+  playerItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '6px 0',
+    borderBottom: '1px solid #eee',
+    fontSize: 14
+  },
 };
