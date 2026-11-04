@@ -2,7 +2,17 @@
   text-align: center;
 }
 
+/* Force the whole page to scroll naturally on mobile */
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #1a1f2b; /* Prevents white flash on load */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  font-family: sans-serif;
+}
 
+/* Keep your default React logo styles below if you use them */
 .App-logo {
   height: 40vmin;
   pointer-events: none;

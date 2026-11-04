@@ -13,17 +13,17 @@ const getPosStyle = (pos) => {
 
 export default function FplDashboard() {
   const [players, setPlayers] = useState([]);
-  const [mySquad, setMySquad] = useState([]); // Array of selected player IDs
-  const [filterPos, setFilterPos] = useState(0); // 0=ALL, 1=GK, 2=DEF, 3=MID, 4=FWD
+  const [mySquad, setMySquad] = useState([]); 
+  const [filterPos, setFilterPos] = useState(0); 
   const [loading, setLoading] = useState(true);
   const [tgId, setTgId] = useState(null);
+
   // 1. Fetch Players on Load
-   useEffect(() => {
+  useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
     
     if (initData) {
       try {
-        // Extract Telegram ID from the WebApp data
         const urlParams = new URLSearchParams(initData);
         const user = JSON.parse(urlParams.get('user'));
         setTgId(user.id);
@@ -32,7 +32,6 @@ export default function FplDashboard() {
       }
     }
 
-    // Fetch players
     axios.get(`${API_BASE}/api/fpl/bootstrap`)
       .then(res => {
         setPlayers(res.data.players);
@@ -60,17 +59,15 @@ export default function FplDashboard() {
     }).length;
   };
 
-  const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 }; // GK, DEF, MID, FWD
+  const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
 
   // 3. Toggle Player Selection
   const togglePlayer = (player) => {
     const isSelected = mySquad.includes(player.id);
 
     if (isSelected) {
-      // Remove from squad
       setMySquad(mySquad.filter(id => id !== player.id));
     } else {
-      // Add to squad (Check rules)
       if (mySquad.length >= 15) return alert("Squad is full (15 players).");
       if (getPosCount(player.position) >= posLimits[player.position]) {
         return alert(`You can only pick ${posLimits[player.position]} players for this position.`);
@@ -85,7 +82,6 @@ export default function FplDashboard() {
   // 4. Filter Players
   const filteredPlayers = players.filter(p => filterPos === 0 || p.position === filterPos);
 
-  if (loading) return <div style={{ padding: 20, color: 'white' }}>Loading players...</div>;
   const handleSave = async () => {
     if (mySquad.length !== 15) {
       return alert(`You must pick exactly 15 players. You currently have ${mySquad.length}.`);
@@ -100,7 +96,6 @@ export default function FplDashboard() {
         squadIds: mySquad
       });
       
-      // Show success using Telegram's native UI if available, otherwise standard alert
       if (window.Telegram?.WebApp?.showAlert) {
         window.Telegram.WebApp.showAlert("Squad saved successfully! ✅");
       } else {
@@ -111,6 +106,9 @@ export default function FplDashboard() {
       alert("Failed to save squad. Please try again.");
     }
   };
+
+  if (loading) return <div style={{ padding: 20, color: 'white', background: '#1a1f2b', minHeight: '100vh' }}>Loading players...</div>;
+
   return (
     <div style={styles.appContainer}>
       {/* HEADER */}
@@ -127,8 +125,8 @@ export default function FplDashboard() {
       {/* CONTROLS */}
       <div style={styles.controls}>
         <button style={styles.pickBtn}>⚽ Pick Players ({mySquad.length}/15)</button>
-        <div style={{ color: '#aaa', fontSize: 14 }}>👑 Captain</div>
-      </div>{/*  */}
+        <div style={{ color: '#aaa', fontSize: 14, whiteSpace: 'nowrap' }}>👑 Captain</div>
+      </div>
 
       {/* POSITION COUNTERS */}
       <div style={styles.posCounters}>
@@ -178,39 +176,38 @@ export default function FplDashboard() {
               onClick={() => togglePlayer(player)}
             >
               {/* Left: Photo & Position */}
-            {/* Left: Photo & Position */}
-<div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-  <div style={{ position: 'relative', width: 40, height: 40 }}>
-    {/* Player Photo */}
-    <img 
-      src={player.photo} 
-      alt={player.name}
-      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: '#2c3547' }}
-      onError={(e) => { e.target.style.display = 'none'; }} // Hide if no photo
-    />
-    {/* Position Badge overlaying the photo */}
-    <div style={{ 
-      position: 'absolute', bottom: -2, right: -2, 
-      background: posStyle.bg, color: 'white', 
-      fontSize: 9, fontWeight: 'bold', 
-      padding: '2px 4px', borderRadius: 4,
-      border: '2px solid #1a1f2b'
-    }}>
-      {posStyle.text}
-    </div>
-  </div>
-  <div>
-    <div style={{ color: 'white', fontWeight: 'bold', fontSize: 15 }}>{player.name}</div>
-    <div style={{ color: '#888', fontSize: 13 }}>{player.team}</div>
-  </div>
-</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+                  <img 
+                    src={player.photo} 
+                    alt={player.name}
+                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: '#2c3547' }}
+                    onError={(e) => { e.target.style.display = 'none'; }} 
+                  />
+                  <div style={{ 
+                    position: 'absolute', bottom: -2, right: -2, 
+                    background: posStyle.bg, color: 'white', 
+                    fontSize: 9, fontWeight: 'bold', 
+                    padding: '2px 4px', borderRadius: 4,
+                    border: '2px solid #1a1f2b'
+                  }}>
+                    {posStyle.text}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '130px' }}>
+                    {player.name}
+                  </div>
+                  <div style={{ color: '#888', fontSize: 13 }}>{player.team}</div>
+                </div>
+              </div>
 
               {/* Right: Points, Price, Checkmark */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
                 <div style={{ color: '#f1c40f', fontSize: 13 }}>★ {player.totalPoints}</div>
                 <div style={{ color: '#2ecc71', fontSize: 14, fontWeight: 'bold' }}>{player.price}</div>
                 <div style={{ 
-                  width: 20, height: 20, borderRadius: '50%', 
+                  width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
                   border: isSelected ? '6px solid #2ecc71' : '2px solid #555',
                   background: isSelected ? '#2ecc71' : 'transparent'
                 }}></div>
@@ -223,20 +220,89 @@ export default function FplDashboard() {
   );
 }
 
-// --- DARK THEME STYLES (Matching your screenshot) ---
+// --- DARK THEME STYLES ---
 const styles = {
-  appContainer: { background: '#1a1f2b', minHeight: '100vh', color: 'white', fontFamily: 'sans-serif' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', borderBottom: '1px solid #2c3547' },
+  appContainer: { 
+    background: '#1a1f2b', 
+    minHeight: '100vh', 
+    color: 'white', 
+    fontFamily: 'sans-serif',
+    width: '100%', 
+    maxWidth: '100vw',
+    overflowX: 'hidden', 
+    boxSizing: 'border-box' 
+  },
+  header: { 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: '15px', 
+    borderBottom: '1px solid #2c3547',
+    boxSizing: 'border-box',
+    width: '100%'
+  },
   saveBtn: { background: '#1e4d40', color: '#2ecc71', border: '1px solid #2ecc71', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
-  controls: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px' },
-  pickBtn: { background: '#1e4d40', color: '#2ecc71', border: '1px solid #2ecc71', padding: '10px 15px', borderRadius: 8, flex: 1, marginRight: 15, fontWeight: 'bold' },
-  posCounters: { display: 'flex', gap: 20, padding: '10px 15px', background: '#212736', borderBottom: '1px solid #2c3547' },
+  controls: { 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: '15px',
+    boxSizing: 'border-box',
+    width: '100%'
+  },
+  pickBtn: { 
+    background: '#1e4d40', 
+    color: '#2ecc71', 
+    border: '1px solid #2ecc71', 
+    padding: '10px 15px', 
+    borderRadius: 8, 
+    flex: 1, 
+    marginRight: 15, 
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap'
+  },
+  posCounters: { 
+    display: 'flex', 
+    gap: 15, 
+    padding: '10px 15px', 
+    background: '#212736', 
+    borderBottom: '1px solid #2c3547',
+    overflowX: 'auto', 
+    whiteSpace: 'nowrap', 
+    boxSizing: 'border-box'
+  },
   actionBtn: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 12px', borderRadius: 6 },
-  filters: { display: 'flex', gap: 8, padding: '10px 15px', overflowX: 'auto' },
+  filters: { 
+    display: 'flex', 
+    gap: 8, 
+    padding: '10px 15px', 
+    overflowX: 'auto', 
+    whiteSpace: 'nowrap', 
+    boxSizing: 'border-box' 
+  },
   filterBtn: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
   filterBtnActive: { background: '#2ecc71', color: 'white', border: 'none', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
   dropdown: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 10px', borderRadius: 6, marginLeft: 'auto' },
-  playerList: { paddingBottom: 60 }, // space for bottom nav
-  playerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderBottom: '1px solid #212736', cursor: 'pointer' },
-  playerRowSelected: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderBottom: '1px solid #212736', background: '#2c3547', cursor: 'pointer' }
+  playerList: { paddingBottom: 60 },
+  playerRow: { 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: '12px 15px', 
+    borderBottom: '1px solid #212736', 
+    cursor: 'pointer',
+    boxSizing: 'border-box',
+    width: '100%'
+  },
+  playerRowSelected: { 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: '12px 15px', 
+    borderBottom: '1px solid #212736', 
+    background: '#2c3547', 
+    cursor: 'pointer',
+    boxSizing: 'border-box',
+    width: '100%'
+  }
 };
