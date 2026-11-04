@@ -159,8 +159,11 @@ router.get('/myteam', async (req, res) => {
 // GET /api/fpl/bootstrap
 router.get('/bootstrap', async (req, res) => {
   try {
-    const rawData = await getBootstrap();
     
+
+   
+    const rawData = await getBootstrap();
+     console.log("Total FPL players:", rawData.elements.length);
     // Create a map of Team IDs to Team Names (e.g., 1 -> "Arsenal")
     const teamMap = {};
     rawData.teams.forEach(t => { teamMap[t.id] = t.name; });
