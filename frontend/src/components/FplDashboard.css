@@ -301,3 +301,34 @@
   gap: 6px;
   flex-shrink: 0;
 }
+/* --- Captain Modal --- */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #1a1f2b;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #2c3547;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.modal-content h3 { margin-top: 0; color: white; }
+.modal-content p { color: #a0aec0; font-size: 13px; margin-bottom: 15px; }
+
+.modal-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid #2c3547;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}

@@ -20,7 +20,8 @@ export default function FplDashboard() {
   const [selectedClub, setSelectedClub] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [tgId, setTgId] = useState(null);
-
+  const [captainId, setCaptainId] = useState(null);
+  const [showCaptainModal, setShowCaptainModal] = useState(false);
   // Fetch Players on Load
   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
@@ -122,11 +123,14 @@ export default function FplDashboard() {
     if (!tgId) {
       return alert("Could not authenticate Telegram user.");
     }
-
+    if (!captainId) {
+      return alert("Please select a Captain before saving!");
+    }
     try {
       await axios.post(`${API_BASE}/api/fpl/save-squad`, {
         telegramId: tgId,
-        squadIds: mySquad
+        squadIds: mySquad,
+        captainId: captainId
       });
       
       if (window.Telegram?.WebApp?.showAlert) {
@@ -156,7 +160,16 @@ export default function FplDashboard() {
     {/* CONTROLS */}
     <div className="controls">
       <button className="pick-btn">⚽ Pick Players ({mySquad.length}/15)</button>
-      <div className="captain-text">👑 Captain</div>
+           <button 
+    className="captain-text" 
+    style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+    onClick={() => {
+      if (mySquad.length !== 15) return alert("You must pick 15 players first!");
+      setShowCaptainModal(true);
+    }}
+  >
+    👑 Captain
+  </button>
     </div>
 
     {/* POSITION COUNTERS */}
@@ -175,7 +188,7 @@ export default function FplDashboard() {
         })}
       </div>
       <div className="action-buttons">
-        <button className="action-btn" onClick={() => setMySquad([])}>Reset</button>
+         <button className="action-btn" onClick={() => { setMySquad([]); setCaptainId(null); }}>Reset</button>
         <button className="action-btn" onClick={handleAutoPick}>Auto</button>
       </div>
     </div>
@@ -228,7 +241,7 @@ export default function FplDashboard() {
                 </span>
               </div>
               <div className="player-info">
-                <div className="player-name">{player.name}</div>
+                <div className="player-name">    {player.name} {captainId === player.id && <span style={{ color: '#f1c40f' }}>(C)</span>}</div>
                 <div className="player-team">{player.team}</div>
               </div>
             </div>
@@ -242,6 +255,42 @@ export default function FplDashboard() {
         );
       })}
     </div>
+          {/* CAPTAIN MODAL */}
+      {showCaptainModal && (
+        <div className="modal-overlay" onClick={() => setShowCaptainModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>Select Captain</h3>
+            <p>Your captain gets double points!</p>
+            <div className="modal-list">
+              {mySquad.map(id => {
+                const player = players.find(p => p.id === id);
+                if (!player) return null;
+                return (
+                  <div 
+                    key={id} 
+                    className={`player-row ${captainId === id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setCaptainId(id);
+                      setShowCaptainModal(false);
+                    }}
+                  >
+                    <div className="player-left">
+                      <img src={player.photo} className="player-photo" alt="" />
+                      <div className="player-info">
+                        <div className="player-name">{player.name}</div>
+                        <div className="player-team">{player.team}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="save-btn" style={{ marginTop: 15, width: '100%' }} onClick={() => setShowCaptainModal(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
   </div>
 );
 }

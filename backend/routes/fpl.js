@@ -191,22 +191,29 @@ router.get('/bootstrap', async (req, res) => {
 });
 // --- 8. Save User's FPL Squad ---
 // POST /api/fpl/save-squad { telegramId, squadIds }
+// --- 8. Save User's FPL Squad & Captain ---
+// POST /api/fpl/save-squad { telegramId, squadIds, captainId }
 router.post('/save-squad', async (req, res) => {
   try {
-    const { telegramId, squadIds } = req.body;
+    const { telegramId, squadIds, captainId } = req.body;
     if (!telegramId || !squadIds || !Array.isArray(squadIds)) {
       return res.status(400).json({ error: 'telegramId and squadIds array required' });
     }
 
     const BingoBord = require('../Models/BingoBord');
     
-    // Save the array of 15 player IDs into the user's document
+    // Save the array of 15 player IDs and the captain ID
     await BingoBord.updateOne(
       { telegramId: Number(telegramId) },
-      { $set: { fplSquad: squadIds } }
+      { 
+        $set: { 
+          fplSquad: squadIds,
+          fplCaptainId: captainId || null // Save captain (or null if none)
+        } 
+      }
     );
 
-    res.json({ success: true, message: 'Squad saved successfully' });
+    res.json({ success: true, message: 'Squad and Captain saved successfully' });
   } catch (err) {
     console.error('FPL save squad error:', err.message);
     res.status(500).json({ error: 'Could not save squad' });
