@@ -39,10 +39,11 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
   padding: 10px 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  background: #212736;
+  border-bottom: 1px solid #2c3547;
 }
 
 .filters {
@@ -259,4 +260,44 @@
   padding: 6px 8px;
   font-size: 12px;
   outline: none;
+}
+/* Position counters: G/K, DEF, MID, FWD */
+.pos-group {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pos-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.pos-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a0aec0;
+}
+
+.pos-val {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Reset and Auto stay horizontally aligned */
+.action-buttons {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
