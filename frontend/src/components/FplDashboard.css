@@ -1,27 +1,42 @@
 /* ===== FplDashboard.css ===== */
-
 .fpl-app {
   background: #1a1f2b;
-  min-height: 100vh;
+  min-height: 100dvh;
   color: white;
   width: 100%;
   max-width: 100vw;
+
   display: flex;
   flex-direction: column;
-  padding-top: env(safe-area-inset-top, 0px);
-}
 
+  padding-top: env(safe-area-inset-top, 0px);
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  box-sizing: border-box;
+}
+.controls,
+.pos-counters,
+.filters {
+  flex-shrink: 0;
+}
 /* ===== HEADER ===== */
 .fpl-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   padding: 12px 16px;
+
   border-bottom: 1px solid #2c3547;
   background: #1a1f2b;
+
   position: sticky;
   top: 0;
   z-index: 10;
+
+  flex-shrink: 0;
 }
 
 .fpl-header h2 {
@@ -176,8 +191,9 @@
 /* ===== PLAYER LIST (SCROLLABLE CONTAINER) ===== */
 .player-list {
   width: 100%;
-  overflow-y: visible; /* Let it expand and flow naturally with the body */
   padding-bottom: 50px;
+
+  overflow: visible;
 }
 
 .player-row {
