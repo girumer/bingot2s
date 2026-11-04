@@ -1,32 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import "./FplDashboard.css";
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || '';
-  
-// Helper to get colors for positions
+
 const getPosStyle = (pos) => {
-  if (pos === 1) return { bg: '#f39c12', text: 'GK' }; // Orange
-  if (pos === 2) return { bg: '#2ecc71', text: 'DEF' }; // Green
-  if (pos === 3) return { bg: '#3498db', text: 'MID' }; // Blue
-  return { bg: '#e74c3c', text: 'FWD' }; // Red
+  if (pos === 1) return { bg: '#f39c12', text: 'GK' };
+  if (pos === 2) return { bg: '#2ecc71', text: 'DEF' };
+  if (pos === 3) return { bg: '#3498db', text: 'MID' };
+  return { bg: '#e74c3c', text: 'FWD' };
 };
+
+const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
 
 export default function FplDashboard() {
   const [players, setPlayers] = useState([]);
   const [mySquad, setMySquad] = useState([]); 
   const [filterPos, setFilterPos] = useState(0); 
+  const [selectedClub, setSelectedClub] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [tgId, setTgId] = useState(null);
 
-  // 1. Fetch Players on Load
+  // Fetch Players on Load
   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
-    
     if (initData) {
       try {
         const urlParams = new URLSearchParams(initData);
         const user = JSON.parse(urlParams.get('user'));
-        setTgId(user.id);
+        if (user) setTgId(user.id);
       } catch (e) {
         console.error("Could not parse Telegram user data", e);
       }
@@ -34,7 +36,7 @@ export default function FplDashboard() {
 
     axios.get(`${API_BASE}/api/fpl/bootstrap`)
       .then(res => {
-        setPlayers(res.data.players);
+        setPlayers(res.data.players || []);
         setLoading(false);
       })
       .catch(err => {
@@ -44,12 +46,13 @@ export default function FplDashboard() {
       });
   }, []);
 
-  // 2. Calculate Budget & Positions
+  // Calculate Budget & Positions
   const budget = 100.0;
   const spent = mySquad.reduce((sum, id) => {
     const p = players.find(x => x.id === id);
-    return sum + (p ? p.price : 0);
+    return sum + (p ? Number(p.price) : 0);
   }, 0);
+
   const remainingBudget = (budget - spent).toFixed(1);
 
   const getPosCount = (posType) => {
@@ -59,9 +62,7 @@ export default function FplDashboard() {
     }).length;
   };
 
-  const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
-
-  // 3. Toggle Player Selection
+  // Toggle Player Selection
   const togglePlayer = (player) => {
     const isSelected = mySquad.includes(player.id);
 
@@ -72,15 +73,47 @@ export default function FplDashboard() {
       if (getPosCount(player.position) >= posLimits[player.position]) {
         return alert(`You can only pick ${posLimits[player.position]} players for this position.`);
       }
-      if (spent + player.price > budget) {
+      if (spent + Number(player.price) > budget) {
         return alert("Not enough budget!");
       }
       setMySquad([...mySquad, player.id]);
     }
   };
 
-  // 4. Filter Players
-  const filteredPlayers = players.filter(p => filterPos === 0 || p.position === filterPos);
+  // Auto Pick Squad Logic
+  const handleAutoPick = () => {
+    let currentSquad = [];
+    let currentSpent = 0;
+
+    // Pick top players by points within limits and budget
+    const sorted = [...players].sort((a, b) => b.totalPoints - a.totalPoints);
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+
+    for (const player of sorted) {
+      const pos = player.position;
+      const price = Number(player.price);
+      if (counts[pos] < posLimits[pos] && currentSpent + price <= budget) {
+        currentSquad.push(player.id);
+        counts[pos] += 1;
+        currentSpent += price;
+      }
+      if (currentSquad.length === 15) break;
+    }
+
+    setMySquad(currentSquad);
+  };
+
+  // Clubs List for Dropdown
+  const clubs = useMemo(() => {
+    return Array.from(new Set(players.map(p => p.team))).filter(Boolean);
+  }, [players]);
+
+  // Filtered Players
+  const filteredPlayers = players.filter(p => {
+    const matchesPos = filterPos === 0 || p.position === filterPos;
+    const matchesClub = selectedClub === 'ALL' || p.team === selectedClub;
+    return matchesPos && matchesClub;
+  });
 
   const handleSave = async () => {
     if (mySquad.length !== 15) {
@@ -107,29 +140,29 @@ export default function FplDashboard() {
     }
   };
 
-  if (loading) return <div style={{ padding: 20, color: 'white', background: '#1a1f2b', minHeight: '100vh' }}>Loading players...</div>;
+  if (loading) return <div className="loading-container">Loading players...</div>;
 
   return (
-    <div style={styles.appContainer}>
+    <div className="fpl-app">
       {/* HEADER */}
-      <div style={styles.header}>
+      <div className="fpl-header">
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>My Squad</h2>
           <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>
             {mySquad.length}/15 · Budget: {remainingBudget} ETB left
           </p>
         </div>
-        <button style={styles.saveBtn} onClick={handleSave}>Save</button>
+        <button className="save-btn" onClick={handleSave}>Save</button>
       </div>
 
       {/* CONTROLS */}
-      <div style={styles.controls}>
-        <button style={styles.pickBtn}>⚽ Pick Players ({mySquad.length}/15)</button>
-        <div style={{ color: '#aaa', fontSize: 14, whiteSpace: 'nowrap' }}>👑 Captain</div>
+      <div className="controls">
+        <button className="pick-btn">⚽ Pick Players ({mySquad.length}/15)</button>
+        <div className="captain-text">👑 Captain</div>
       </div>
 
       {/* POSITION COUNTERS */}
-      <div style={styles.posCounters}>
+      <div className="pos-counters">
         {[1, 2, 3, 4].map(pos => {
           const style = getPosStyle(pos);
           return (
@@ -141,30 +174,37 @@ export default function FplDashboard() {
             </div>
           );
         })}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-          <button style={styles.actionBtn} onClick={() => setMySquad([])}>Reset</button>
-          <button style={styles.actionBtn}>Auto</button>
+        <div className="action-buttons">
+          <button className="action-btn" onClick={() => setMySquad([])}>Reset</button>
+          <button className="action-btn" onClick={handleAutoPick}>Auto</button>
         </div>
       </div>
 
       {/* FILTERS */}
-      <div style={styles.filters}>
+      <div className="filters">
         {['ALL', 'GK', 'DEF', 'MID', 'FWD'].map((label, idx) => (
           <button
             key={label}
-            style={filterPos === idx ? styles.filterBtnActive : styles.filterBtn}
+            className={`filter-btn ${filterPos === idx ? 'active' : ''}`}
             onClick={() => setFilterPos(idx)}
           >
             {label}
           </button>
         ))}
-        <select style={styles.dropdown}>
-          <option>All Clubs</option>
+        <select 
+          className="club-select" 
+          value={selectedClub} 
+          onChange={(e) => setSelectedClub(e.target.value)}
+        >
+          <option value="ALL">All Clubs</option>
+          {clubs.map(club => (
+            <option key={club} value={club}>{club}</option>
+          ))}
         </select>
       </div>
 
       {/* PLAYER LIST */}
-      <div style={styles.playerList}>
+      <div className="player-list">
         {filteredPlayers.map(player => {
           const isSelected = mySquad.includes(player.id);
           const posStyle = getPosStyle(player.position);
@@ -172,16 +212,16 @@ export default function FplDashboard() {
           return (
             <div 
               key={player.id} 
-              style={isSelected ? styles.playerRowSelected : styles.playerRow}
+              className={`player-row ${isSelected ? 'selected' : ''}`}
               onClick={() => togglePlayer(player)}
             >
               {/* Left: Photo & Position */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+              <div className="player-left">
+                <div className="player-photo-wrapper">
                   <img 
                     src={player.photo} 
                     alt={player.name}
-                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: '#2c3547' }}
+                    className="player-photo"
                     onError={(e) => { e.target.style.display = 'none'; }} 
                   />
                   <div style={{ 
@@ -195,22 +235,16 @@ export default function FplDashboard() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '130px' }}>
-                    {player.name}
-                  </div>
-                  <div style={{ color: '#888', fontSize: 13 }}>{player.team}</div>
+                  <div className="player-name">{player.name}</div>
+                  <div className="player-team">{player.team}</div>
                 </div>
               </div>
 
               {/* Right: Points, Price, Checkmark */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                <div style={{ color: '#f1c40f', fontSize: 13 }}>★ {player.totalPoints}</div>
-                <div style={{ color: '#2ecc71', fontSize: 14, fontWeight: 'bold' }}>{player.price}</div>
-                <div style={{ 
-                  width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                  border: isSelected ? '6px solid #2ecc71' : '2px solid #555',
-                  background: isSelected ? '#2ecc71' : 'transparent'
-                }}></div>
+              <div className="player-right">
+                <div className="player-points">★ {player.totalPoints}</div>
+                <div className="player-price">{player.price}</div>
+                <div className={`player-check ${isSelected ? 'selected' : ''}`}></div>
               </div>
             </div>
           );
@@ -219,90 +253,3 @@ export default function FplDashboard() {
     </div>
   );
 }
-
-// --- DARK THEME STYLES ---
-const styles = {
-  appContainer: { 
-    background: '#1a1f2b', 
-    minHeight: '100vh', 
-    color: 'white', 
-    fontFamily: 'sans-serif',
-    width: '100%', 
-    maxWidth: '100vw',
-    overflowX: 'hidden', 
-    boxSizing: 'border-box' 
-  },
-  header: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '15px', 
-    borderBottom: '1px solid #2c3547',
-    boxSizing: 'border-box',
-    width: '100%'
-  },
-  saveBtn: { background: '#1e4d40', color: '#2ecc71', border: '1px solid #2ecc71', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
-  controls: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '15px',
-    boxSizing: 'border-box',
-    width: '100%'
-  },
-  pickBtn: { 
-    background: '#1e4d40', 
-    color: '#2ecc71', 
-    border: '1px solid #2ecc71', 
-    padding: '10px 15px', 
-    borderRadius: 8, 
-    flex: 1, 
-    marginRight: 15, 
-    fontWeight: 'bold',
-    whiteSpace: 'nowrap'
-  },
-  posCounters: { 
-    display: 'flex', 
-    gap: 15, 
-    padding: '10px 15px', 
-    background: '#212736', 
-    borderBottom: '1px solid #2c3547',
-    overflowX: 'auto', 
-    whiteSpace: 'nowrap', 
-    boxSizing: 'border-box'
-  },
-  actionBtn: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 12px', borderRadius: 6 },
-  filters: { 
-    display: 'flex', 
-    gap: 8, 
-    padding: '10px 15px', 
-    overflowX: 'auto', 
-    whiteSpace: 'nowrap', 
-    boxSizing: 'border-box' 
-  },
-  filterBtn: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
-  filterBtnActive: { background: '#2ecc71', color: 'white', border: 'none', padding: '6px 15px', borderRadius: 20, fontWeight: 'bold' },
-  dropdown: { background: '#2c3547', color: '#ccc', border: 'none', padding: '6px 10px', borderRadius: 6, marginLeft: 'auto' },
-  playerList: { paddingBottom: 60 },
-  playerRow: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '12px 15px', 
-    borderBottom: '1px solid #212736', 
-    cursor: 'pointer',
-    boxSizing: 'border-box',
-    width: '100%'
-  },
-  playerRowSelected: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '12px 15px', 
-    borderBottom: '1px solid #212736', 
-    background: '#2c3547', 
-    cursor: 'pointer',
-    boxSizing: 'border-box',
-    width: '100%'
-  }
-};
