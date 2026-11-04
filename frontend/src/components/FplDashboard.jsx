@@ -143,113 +143,105 @@ export default function FplDashboard() {
   if (loading) return <div className="loading-container">Loading players...</div>;
 
   return (
-    <div className="fpl-app">
-      {/* HEADER */}
-      <div className="fpl-header">
-        <div>
-          <h2 style={{ margin: 0, fontSize: 18 }}>My Squad</h2>
-          <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>
-            {mySquad.length}/15 · Budget: {remainingBudget} ETB left
-          </p>
-        </div>
-        <button className="save-btn" onClick={handleSave}>Save</button>
+  <div className="fpl-app">
+    {/* HEADER */}
+    <div className="fpl-header">
+      <div>
+        <h2>My Squad</h2>
+        <p>{mySquad.length}/15 · Budget: {remainingBudget} ETB left</p>
       </div>
+      <button className="save-btn" onClick={handleSave}>Save</button>
+    </div>
 
-      {/* CONTROLS */}
-      <div className="controls">
-        <button className="pick-btn">⚽ Pick Players ({mySquad.length}/15)</button>
-        <div className="captain-text">👑 Captain</div>
-      </div>
+    {/* CONTROLS */}
+    <div className="controls">
+      <button className="pick-btn">⚽ Pick Players ({mySquad.length}/15)</button>
+      <div className="captain-text">👑 Captain</div>
+    </div>
 
-      {/* POSITION COUNTERS */}
-      <div className="pos-counters">
+    {/* POSITION COUNTERS */}
+    <div className="pos-counters">
+      <div className="pos-group">
         {[1, 2, 3, 4].map(pos => {
           const style = getPosStyle(pos);
           return (
-            <div key={pos} style={{ textAlign: 'center' }}>
-              <div style={{ color: '#ccc', fontSize: 12, fontWeight: 'bold' }}>{style.text}</div>
-              <div style={{ color: getPosCount(pos) >= posLimits[pos] ? style.bg : '#fff', fontSize: 14 }}>
+            <div key={pos} className="pos-item">
+              <div className="pos-label">{style.text}</div>
+              <div className="pos-val" style={{ color: getPosCount(pos) >= posLimits[pos] ? style.bg : '#fff' }}>
                 {getPosCount(pos)}/{posLimits[pos]}
               </div>
             </div>
           );
         })}
-        <div className="action-buttons">
-          <button className="action-btn" onClick={() => setMySquad([])}>Reset</button>
-          <button className="action-btn" onClick={handleAutoPick}>Auto</button>
-        </div>
       </div>
-
-      {/* FILTERS */}
-      <div className="filters">
-        {['ALL', 'GK', 'DEF', 'MID', 'FWD'].map((label, idx) => (
-          <button
-            key={label}
-            className={`filter-btn ${filterPos === idx ? 'active' : ''}`}
-            onClick={() => setFilterPos(idx)}
-          >
-            {label}
-          </button>
-        ))}
-        <select 
-          className="club-select" 
-          value={selectedClub} 
-          onChange={(e) => setSelectedClub(e.target.value)}
-        >
-          <option value="ALL">All Clubs</option>
-          {clubs.map(club => (
-            <option key={club} value={club}>{club}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* PLAYER LIST */}
-      <div className="player-list">
-        {filteredPlayers.map(player => {
-          const isSelected = mySquad.includes(player.id);
-          const posStyle = getPosStyle(player.position);
-          
-          return (
-            <div 
-              key={player.id} 
-              className={`player-row ${isSelected ? 'selected' : ''}`}
-              onClick={() => togglePlayer(player)}
-            >
-              {/* Left: Photo & Position */}
-              <div className="player-left">
-                <div className="player-photo-wrapper">
-                  <img 
-                    src={player.photo} 
-                    alt={player.name}
-                    className="player-photo"
-                    onError={(e) => { e.target.style.display = 'none'; }} 
-                  />
-                  <div style={{ 
-                    position: 'absolute', bottom: -2, right: -2, 
-                    background: posStyle.bg, color: 'white', 
-                    fontSize: 9, fontWeight: 'bold', 
-                    padding: '2px 4px', borderRadius: 4,
-                    border: '2px solid #1a1f2b'
-                  }}>
-                    {posStyle.text}
-                  </div>
-                </div>
-                <div>
-                  <div className="player-name">{player.name}</div>
-                  <div className="player-team">{player.team}</div>
-                </div>
-              </div>
-
-              {/* Right: Points, Price, Checkmark */}
-              <div className="player-right">
-                <div className="player-points">★ {player.totalPoints}</div>
-                <div className="player-price">{player.price}</div>
-                <div className={`player-check ${isSelected ? 'selected' : ''}`}></div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="action-buttons">
+        <button className="action-btn" onClick={() => setMySquad([])}>Reset</button>
+        <button className="action-btn" onClick={handleAutoPick}>Auto</button>
       </div>
     </div>
-  );
+
+    {/* FILTERS */}
+    <div className="filters">
+      {['ALL', 'GK', 'DEF', 'MID', 'FWD'].map((label, idx) => (
+        <button
+          key={label}
+          className={`filter-btn ${filterPos === idx ? 'active' : ''}`}
+          onClick={() => setFilterPos(idx)}
+        >
+          {label}
+        </button>
+      ))}
+      <select 
+        className="club-select" 
+        value={selectedClub} 
+        onChange={(e) => setSelectedClub(e.target.value)}
+      >
+        <option value="ALL">All Clubs</option>
+        {clubs.map(club => (
+          <option key={club} value={club}>{club}</option>
+        ))}
+      </select>
+    </div>
+
+    {/* PLAYER LIST */}
+    <div className="player-list">
+      {filteredPlayers.map(player => {
+        const isSelected = mySquad.includes(player.id);
+        const posStyle = getPosStyle(player.position);
+        
+        return (
+          <div 
+            key={player.id} 
+            className={`player-row ${isSelected ? 'selected' : ''}`}
+            onClick={() => togglePlayer(player)}
+          >
+            <div className="player-left">
+              <div className="player-photo-wrapper">
+                <img 
+                  src={player.photo} 
+                  alt={player.name}
+                  className="player-photo"
+                  onError={(e) => { e.target.style.display = 'none'; }} 
+                />
+                <span className="player-badge" style={{ background: posStyle.bg }}>
+                  {posStyle.text}
+                </span>
+              </div>
+              <div className="player-info">
+                <div className="player-name">{player.name}</div>
+                <div className="player-team">{player.team}</div>
+              </div>
+            </div>
+
+            <div className="player-right">
+              <div className="player-points">★ {player.totalPoints}</div>
+              <div className="player-price">{player.price}</div>
+              <div className={`player-check ${isSelected ? 'selected' : ''}`}></div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
 }
