@@ -1,37 +1,14 @@
-/* ===== GLOBAL & SCROLL RESET ===== */
-* {
-  box-sizing: border-box;
-}
+/* ===== FplDashboard.css ===== */
 
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  min-height: 100%;
-  background: #1a1f2b;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  -webkit-overflow-scrolling: touch;
-}
-
-.loading-container {
-  padding: 30px 20px;
-  color: #ffffff;
-  background: #1a1f2b;
-  min-height: 100vh;
-  text-align: center;
-}
-
-/* ===== APP WRAPPER ===== */
 .fpl-app {
   background: #1a1f2b;
   min-height: 100vh;
   color: white;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  padding-top: env(safe-area-inset-top, 0px); /* Respect Telegram / Mobile status bar */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* ===== HEADER ===== */
@@ -196,10 +173,11 @@ html, body, #root {
   outline: none;
 }
 
-/* ===== PLAYER LIST ===== */
+/* ===== PLAYER LIST (SCROLLABLE CONTAINER) ===== */
 .player-list {
-  flex: 1;
-  padding-bottom: 40px;
+  width: 100%;
+  overflow-y: visible; /* Let it expand and flow naturally with the body */
+  padding-bottom: 50px;
 }
 
 .player-row {
