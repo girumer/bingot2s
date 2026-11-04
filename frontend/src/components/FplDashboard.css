@@ -39,11 +39,10 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   padding: 10px 16px;
-  background: #212736;
-  border-bottom: 1px solid #2c3547;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .filters {
