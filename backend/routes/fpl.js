@@ -128,6 +128,7 @@ router.post('/bind', async (req, res) => {
 
 // --- 6. Get my FPL team (by telegramId) ---
 // GET /api/fpl/myteam?telegramId=XXX
+// --- 6. Get my FPL team (by telegramId) ---
 router.get('/myteam', async (req, res) => {
   try {
     const { telegramId } = req.query;
@@ -135,17 +136,19 @@ router.get('/myteam', async (req, res) => {
 
     const BingoBord = require('../Models/BingoBord');
     const user = await BingoBord.findOne({ telegramId: Number(telegramId) });
-    if (!user || !user.fplTeamId) {
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // If they don't have a team yet, return 404 so React knows to force 'building' state
+    if (!user.fplSquad || user.fplSquad.length === 0) {
       return res.status(404).json({ error: 'No FPL team bound' });
     }
 
-    const entry = await fpl.fetchEntry(user.fplTeamId);
     res.json({
-      teamId: user.fplTeamId,
-      name: entry.name,
-      overallPoints: entry.summary_overall_points,
-      overallRank: entry.summary_overall_rank,
-      currentGwPoints: entry.summary_event_points
+      fplSquad: user.fplSquad,
+      fplCaptainId: user.fplCaptainId
     });
   } catch (err) {
     console.error('FPL myteam error:', err.message);

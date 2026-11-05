@@ -27,18 +27,39 @@ export default function FplDashboard() {
   const [captainId, setCaptainId] = useState(null);
   const [showCaptainModal, setShowCaptainModal] = useState(false);
   // Fetch Players on Load
-  useEffect(() => {
+   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
     if (initData) {
       try {
         const urlParams = new URLSearchParams(initData);
         const user = JSON.parse(urlParams.get('user'));
-        if (user) setTgId(user.id);
+        
+        if (user) {
+          setTgId(user.id);
+          
+          // ✅ 1. Check if they have a saved squad
+          axios.get(`${API_BASE}/api/fpl/myteam?telegramId=${user.id}`)
+            .then(res => {
+              if (res.data.fplSquad && res.data.fplSquad.length > 0) {
+                setMySquad(res.data.fplSquad);
+                setCaptainId(res.data.fplCaptainId);
+                setGameState('lobby'); // Go to Lobby because they have a team
+              } else {
+                setGameState('building'); // Force building if no team
+              }
+            })
+            .catch(() => {
+              // If they don't have a team (404), send them to the builder
+              setGameState('building'); 
+            });
+        }
       } catch (e) {
         console.error("Could not parse Telegram user data", e);
+        setGameState('building');
       }
     }
 
+    // ✅ 2. Fetch the players data (always runs)
     axios.get(`${API_BASE}/api/fpl/bootstrap`)
       .then(res => {
         setPlayers(res.data.players || []);
@@ -62,7 +83,7 @@ export default function FplDashboard() {
 
     const handleError = (err) => {
       alert(err.message);
-      setGameState('building'); // Send them back to edit their team
+       setGameState('lobby'); // Send them back to edit their team
     };
 
     socket.on("fpl_match_start", handleMatchStart);
@@ -144,48 +165,50 @@ export default function FplDashboard() {
   });
 
     // Inside your existing handleSave function:
-  const handleSave = async () => {
+    const handleSave = async () => {
     if (mySquad.length !== 15) return alert(`Pick exactly 15 players. You have ${mySquad.length}.`);
     if (!captainId) return alert("Please select a Captain!");
     if (!tgId) return alert("Authentication error.");
 
     try {
-      // 1. Save to DB first
+      // 1. Save to DB only
       await axios.post(`${API_BASE}/api/fpl/save-squad`, {
         telegramId: tgId,
         squadIds: mySquad,
         captainId: captainId
       });
 
-      // 2. Tell Socket.io to join the room and wait for an opponent
-      // (Assuming you have imported your socket instance)
-          socket.emit("fpl_join_room", {
-        telegramId: tgId,
-        roomId: roomStake,
-        squadIds: mySquad,
-        captainId: captainId,
-        
-        // Send the calculated points to the backend!
-        totalScore: mySquad.reduce((sum, id) => {
-          const p = players.find(x => x.id === id);
-          const pts = p ? p.totalPoints : 0;
-          return sum + (id === captainId ? pts * 2 : pts);
-        }, 0)
-      });
-
-      setGameState('waiting');
+      alert("Squad saved successfully! ✅");
+      setGameState('lobby'); // ✅ Go to Lobby instead of waiting
       
     } catch (err) {
       console.error(err);
-      alert("Failed to save squad. Do you have enough balance?");
+      alert("Failed to save squad.");
     }
   };
-  if (gameState === 'lobby') {
+    if (gameState === 'lobby') {
+    // Calculate the points of their saved squad
+    const squadScore = mySquad.reduce((sum, id) => {
+      const p = players.find(x => x.id === id);
+      const pts = p ? p.totalPoints : 0;
+      return sum + (id === captainId ? pts * 2 : pts);
+    }, 0);
+
     return (
       <div className="fpl-app" style={{ padding: 20 }}>
         <h2 style={{ color: 'white', textAlign: 'center' }}>⚽ FPL Multiplayer</h2>
-        <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 30 }}>
-          Select a room to play Head-to-Head against another manager!
+        
+        {/* Show saved squad info */}
+        <div className="card" style={{ margin: '20px 0', textAlign: 'center' }}>
+          <h3>Your Squad is Ready!</h3>
+          <p style={{ color: '#2ecc71', fontSize: 20, fontWeight: 'bold' }}>{squadScore} Total Points</p>
+          <button className="action-btn" onClick={() => setGameState('building')}>
+            ✏️ Edit Team
+          </button>
+        </div>
+
+        <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 15 }}>
+          Select a room to play Head-to-Head:
         </p>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
@@ -196,7 +219,15 @@ export default function FplDashboard() {
               style={{ padding: 20, fontSize: 18, background: '#2c3547', color: 'white' }}
               onClick={() => {
                 setRoomStake(stake);
-                setGameState('building');
+                // ✅ Now we trigger the socket matchmaking directly!
+                socket.emit("fpl_join_room", {
+                  telegramId: tgId,
+                  roomId: stake,
+                  squadIds: mySquad,
+                  captainId: captainId,
+                  totalScore: squadScore // Send the pre-calculated score
+                });
+                setGameState('waiting');
               }}
             >
               Join Room {stake} ETB
@@ -275,8 +306,9 @@ export default function FplDashboard() {
           onClick={() => {
             setGameState('lobby');
             setOpponent(null);
-            setMySquad([]);
-            setCaptainId(null);
+           
+
+
           }}
         >
           Play Again

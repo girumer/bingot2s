@@ -850,15 +850,19 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
 
         console.log(`[FPL MATCH] Room ${stake}: ${opponent.username} (${opponent.totalScore} pts) vs ${user.username} (${playerData.totalScore} pts)`);
                 // 🏆 PAY THE WINNER INSTANTLY
+             // 🏆 PAY THE WINNER INSTANTLY
         if (winner) {
-            // Winner gets 180% of their stake (e.g., 10 ETB stake = 18 ETB win). 
-            // This leaves a 10% house edge for the platform (2 ETB profit).
             const payout = stake * 1.8; 
             await BingoBord.updateOne(
                 { telegramId: winner.telegramId },
                 { $inc: { Wallet: payout } }
             );
             console.log(`[FPL PAYOUT] Awarded ${payout} ETB to ${winner.username}`);
+        } else if (isDraw) {
+            // ✅ REFUND BOTH PLAYERS ON A DRAW
+            await BingoBord.updateOne({ telegramId: playerData.telegramId }, { $inc: { Wallet: stake } });
+            await BingoBord.updateOne({ telegramId: opponent.telegramId }, { $inc: { Wallet: stake } });
+            console.log(`[FPL DRAW] Refunded ${stake} ETB to both players`);
         }
      
      
