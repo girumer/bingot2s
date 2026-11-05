@@ -805,7 +805,7 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
   // ==========================================
   // Tracks waiting players
 
-  socket.on("fpl_join_room", async ({ telegramId, roomId, squadIds, captainId, totalScore}) => {
+    socket.on("fpl_join_room", async ({ telegramId, roomId, squadIds, captainId, totalScore}) => {
     try {
       const stake = Number(roomId);
       const user = await BingoBord.findOne({ telegramId: Number(telegramId) });
@@ -829,96 +829,93 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
       };
 
       fplRooms[stake].push(playerData);
-      socket.emit("fpl_waiting", { message: "Waiting for opponent..." });
       broadcastFplLobbies();
 
-      // 🕒 START OR UPDATE THE TIMER
-      if (!fplTimers[stake]) {
-        // First player joined, start the timer
-        fplTimers[stake] = { timeLeft: 30 };
-        
-        fplTimers[stake].interval = setInterval(async () => {
-            fplTimers[stake].timeLeft -= 1;
-            const time = fplTimers[stake].timeLeft;
+      // ✅ START TIMER ONLY WHEN 2 OR MORE PLAYERS ARE IN THE ROOM
+      if (fplRooms[stake].length >= 2) {
+        if (!fplTimers[stake]) {
+          fplTimers[stake] = { timeLeft: 30 };
+          
+          fplTimers[stake].interval = setInterval(async () => {
+              fplTimers[stake].timeLeft -= 1;
+              const time = fplTimers[stake].timeLeft;
 
-            // 🔥 CALCULATE CURRENT MAX PRIZE
-            const currentPlayers = fplRooms[stake].length;
-            const totalPot = currentPlayers * stake;
-            let maxPrize = 0;
-            if (currentPlayers >= 10) {
-               maxPrize = Math.floor(totalPot * 0.40); // 1st place gets 40%
-            } else if (currentPlayers >= 2) {
-               maxPrize = Math.floor(totalPot * 0.90); // 1st place gets 90%
-            }
+              const currentPlayers = fplRooms[stake].length;
+              const totalPot = currentPlayers * stake;
+              
+              // 🔥 LIVE MAX PRIZE DISPLAY
+              // 90% if < 10 players, 40% if >= 10 players
+              let maxPrize = currentPlayers >= 10 ? Math.floor(totalPot * 0.40) : Math.floor(totalPot * 0.90);
 
-            // Send countdown AND max prize to everyone waiting
-            fplRooms[stake].forEach(p => {
-                io.to(p.socketId).emit("fpl_match_found", { timeLeft: time, maxPrize: maxPrize });
-            });
+              fplRooms[stake].forEach(p => {
+                  io.to(p.socketId).emit("fpl_match_found", { timeLeft: time, maxPrize: maxPrize });
+              });
 
-            // When timer hits 0, START THE GAME
-            if (time <= 0) {
-                clearInterval(fplTimers[stake].interval);
-                
-                const playersInGame = [...fplRooms[stake]];
-                fplRooms[stake] = []; 
-                fplTimers[stake] = null; 
-                broadcastFplLobbies();
+              if (time <= 0) {
+                  clearInterval(fplTimers[stake].interval);
+                  
+                  const playersInGame = [...fplRooms[stake]];
+                  fplRooms[stake] = []; 
+                  fplTimers[stake] = null; 
+                  broadcastFplLobbies();
 
-                if (playersInGame.length === 0) return;
+                  if (playersInGame.length === 0) return;
 
-                // 🏆 SORT PLAYERS BY SCORE
-                playersInGame.sort((a, b) => b.totalScore - a.totalScore);
+                  // SORT HIGHEST SCORE FIRST
+                  playersInGame.sort((a, b) => b.totalScore - a.totalScore);
 
-                const finalTotalPot = playersInGame.length * stake;
-                let payouts = {};
+                  const finalTotalPot = playersInGame.length * stake;
+                  let payouts = {};
 
-                // 💰 CALCULATE FINAL PAYOUTS BASED ON THRESHOLD
-                if (playersInGame.length === 1) {
-                    payouts[playersInGame[0].telegramId] = stake; // Refund if alone
-                } 
-                else if (playersInGame.length < 10) {
-                    // Less than 10 players: Winner takes 90%
-                    const winnerPrize = Math.floor(finalTotalPot * 0.90);
-                    payouts[playersInGame[0].telegramId] = winnerPrize;
-                } 
-                else {
-                    // 10 or more players: 40%, 30%, 20%
-                    payouts[playersInGame[0].telegramId] = Math.floor(finalTotalPot * 0.40);
-                    payouts[playersInGame[1].telegramId] = Math.floor(finalTotalPot * 0.30);
-                    if (playersInGame[2]) {
-                        payouts[playersInGame[2].telegramId] = Math.floor(finalTotalPot * 0.20);
-                    }
-                }
+                  // 💰 YOUR EXACT PAYOUT RULES
+                  if (playersInGame.length === 1) {
+                      // Safety refund if only 1 player
+                      payouts[playersInGame[0].telegramId] = stake;
+                  } 
+                  else if (playersInGame.length < 10) {
+                      // 2 to 9 Players: 1st Place takes 90%
+                      payouts[playersInGame[0].telegramId] = Math.floor(finalTotalPot * 0.90); 
+                  } 
+                  else {
+                      // 10+ Players: 1st 40%, 2nd 30%, 3rd 20%
+                      payouts[playersInGame[0].telegramId] = Math.floor(finalTotalPot * 0.40);
+                      payouts[playersInGame[1].telegramId] = Math.floor(finalTotalPot * 0.30);
+                      payouts[playersInGame[2].telegramId] = Math.floor(finalTotalPot * 0.20);
+                  }
 
-                // 💸 EXECUTE PAYOUTS & SEND RESULTS
-                for (const player of playersInGame) {
-                    const prize = payouts[player.telegramId] || 0;
-                    if (prize > 0) {
-                        await BingoBord.updateOne({ telegramId: player.telegramId }, { $inc: { Wallet: prize } });
-                    }
+                  // EXECUTE PAYOUTS
+                  for (const player of playersInGame) {
+                      const prize = payouts[player.telegramId] || 0;
+                      if (prize > 0) {
+                          await BingoBord.updateOne({ telegramId: player.telegramId }, { $inc: { Wallet: prize } });
+                      }
 
-                    let rank = playersInGame.findIndex(p => p.telegramId === player.telegramId) + 1;
-                    
-                    io.to(player.socketId).emit("fpl_match_start", {
-                        roomId: stake,
-                        totalPlayers: playersInGame.length,
-                        myRank: rank,
-                        myPrize: prize,
-                        winner: playersInGame[0],
-                        allScores: playersInGame.map(p => ({ username: p.username, score: p.totalScore }))
-                    });
-                }
-            }
-        }, 1000);
+                      let rank = playersInGame.findIndex(p => p.telegramId === player.telegramId) + 1;
+                      
+                      io.to(player.socketId).emit("fpl_match_start", {
+                          roomId: stake,
+                          totalPlayers: playersInGame.length,
+                          myRank: rank,
+                          myPrize: prize,
+                          myUsername: player.username,
+                          winner: playersInGame[0],
+                          allScores: playersInGame.map(p => ({ username: p.username, score: p.totalScore }))
+                      });
+                  }
+              }
+          }, 1000);
+        } else {
+          // Player 3, 4, 5... joins mid-countdown
+          const timeLeft = fplTimers[stake].timeLeft;
+          const currentPlayers = fplRooms[stake].length;
+          const totalPot = currentPlayers * stake;
+          let maxPrize = currentPlayers >= 10 ? Math.floor(totalPot * 0.40) : Math.floor(totalPot * 0.90);
+          
+          socket.emit("fpl_match_found", { timeLeft: timeLeft, maxPrize: maxPrize });
+        }
       } else {
-        // Someone else joined mid-countdown. Instantly send them the current state.
-        const timeLeft = fplTimers[stake].timeLeft;
-        const currentPlayers = fplRooms[stake].length;
-        const totalPot = currentPlayers * stake;
-        let maxPrize = currentPlayers >= 10 ? Math.floor(totalPot * 0.40) : Math.floor(totalPot * 0.90);
-        
-        socket.emit("fpl_match_found", { timeLeft: timeLeft, maxPrize: maxPrize });
+        // Player 1 waiting alone (no timer)
+        socket.emit("fpl_waiting", { message: "Waiting for opponent..." });
       }
 
     } catch (err) {

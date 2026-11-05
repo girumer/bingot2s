@@ -355,60 +355,137 @@ export default function FplDashboard() {
       );
     }
 
-    if (gameState === 'matchup' && opponent && matchData) {
-    // Determine if I won, lost, or drew based on the backend data
-    let resultText = "🤝 It's a Draw!";
-    let resultColor = "#f1c40f"; // Yellow
-    
-    // Note: we need to know who I am to check if I won
-    const myScore = matchData.player1.telegramId === tgId ? matchData.player1.totalScore : matchData.player2.totalScore;
-    const oppScore = matchData.player1.telegramId === tgId ? matchData.player2.totalScore : matchData.player1.totalScore;
-
-    if (matchData.winner) {
-      if (matchData.winner.telegramId === tgId) {
-        resultText = "🎉 You Won!";
-        resultColor = "#2ecc71"; // Green
+       if (gameState === 'matchup' && matchData) {
+      const { myRank, myPrize, allScores, totalPlayers, roomId, myUsername } = matchData;
+      
+      // Calculate prizes for the leaderboard display (matches the backend logic)
+      const totalPot = totalPlayers * Number(roomId);
+      let firstPrize = 0, secondPrize = 0, thirdPrize = 0;
+      
+      if (totalPlayers >= 10) {
+        firstPrize = Math.floor(totalPot * 0.40);
+        secondPrize = Math.floor(totalPot * 0.30);
+        thirdPrize = Math.floor(totalPot * 0.20);
       } else {
-        resultText = "❌ You Lost.";
-        resultColor = "#e74c3c"; // Red
+        firstPrize = Math.floor(totalPot * 0.90);
       }
-    }
 
-    return (
-      <div className="fpl-app" style={{ padding: 20 }}>
-        <h2 style={{ color: 'white', textAlign: 'center' }}>⚔️ Match Result</h2>
-        
-        <h1 style={{ color: resultColor, textAlign: 'center', marginTop: 40, fontSize: 32 }}>
-          {resultText}
-        </h1>
+      let resultText = "";
+      let resultColor = "";
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 30 }}>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <h3 style={{ color: '#2ecc71' }}>You</h3>
-            <p style={{ color: 'white', fontSize: 24 }}>{myScore} pts</p>
+      if (myRank === 1) {
+        resultText = "🥇 You Won 1st Place!";
+        resultColor = "#f1c40f";
+      } else if (myRank === 2) {
+        resultText = "🥈 You Won 2nd Place!";
+        resultColor = "#bdc3c7";
+      } else if (myRank === 3) {
+        resultText = "🥉 You Won 3rd Place!";
+        resultColor = "#cd7f32";
+      } else {
+        resultText = "❌ You Didn't Place.";
+        resultColor = "#e74c3c";
+      }
+
+      return (
+        <div className="fpl-app" style={{ padding: 20 }}>
+          <h2 style={{ color: 'white', textAlign: 'center' }}>⚔️ Tournament Results</h2>
+          <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 20 }}>
+            {totalPlayers} Players Competed in Room {roomId} ETB
+          </p>
+          
+          <h1 style={{ color: resultColor, textAlign: 'center', fontSize: 28, marginBottom: 10 }}>
+            {resultText}
+          </h1>
+          
+          {myPrize > 0 ? (
+            <p style={{ color: '#2ecc71', textAlign: 'center', fontSize: 22, fontWeight: 'bold', marginBottom: 30 }}>
+              +{myPrize} ETB Added to Wallet
+            </p>
+          ) : (
+            <p style={{ color: '#e74c3c', textAlign: 'center', fontSize: 16, marginBottom: 30 }}>
+              Better luck next time!
+            </p>
+          )}
+
+          {/* LEADERBOARD */}
+          <div style={{ background: '#2c3547', borderRadius: 10, padding: 15, marginBottom: 30 }}>
+            <h3 style={{ color: 'white', marginTop: 0, marginBottom: 15, borderBottom: '1px solid #4a5568', paddingBottom: 10 }}>
+              Leaderboard
+            </h3>
+            {allScores.map((score, index) => {
+              let rankIcon = `#${index + 1}`;
+              let rowColor = 'white';
+              let rowBg = 'transparent';
+              let prizeText = '';
+              const isMe = score.username === myUsername;
+
+              if (index === 0) {
+                rankIcon = '🥇';
+                rowColor = '#f1c40f';
+                rowBg = 'rgba(241, 196, 15, 0.1)';
+                prizeText = `+${firstPrize} ETB`;
+              } else if (index === 1 && totalPlayers >= 10) {
+                rankIcon = '🥈';
+                rowColor = '#bdc3c7';
+                rowBg = 'rgba(189, 195, 199, 0.1)';
+                prizeText = `+${secondPrize} ETB`;
+              } else if (index === 2 && totalPlayers >= 10) {
+                rankIcon = '🥉';
+                rowColor = '#cd7f32';
+                rowBg = 'rgba(205, 127, 50, 0.1)';
+                prizeText = `+${thirdPrize} ETB`;
+              }
+
+              // Highlight the current user's row with a border
+              const myBorder = isMe ? '2px solid #2ecc71' : 'none';
+
+              return (
+                <div key={index} style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '12px 10px', 
+                  borderBottom: index !== allScores.length - 1 ? '1px solid #3e4c61' : 'none',
+                  background: rowBg,
+                  borderRadius: 6,
+                  marginBottom: 4,
+                  border: myBorder
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>{rankIcon}</span>
+                    <span style={{ color: isMe ? '#2ecc71' : rowColor, fontWeight: index === 0 || isMe ? 'bold' : 'normal', fontSize: 15 }}>
+                      {score.username} {isMe && "(You)"}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+                    <span style={{ color: '#a0aec0', fontSize: 13 }}>
+                      {score.score} pts
+                    </span>
+                    {prizeText && (
+                      <span style={{ color: '#2ecc71', fontWeight: 'bold', fontSize: 14 }}>
+                        {prizeText}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <h3 style={{ color: '#e74c3c' }}>{opponent.username}</h3>
-            <p style={{ color: 'white', fontSize: 24 }}>{oppScore} pts</p>
-          </div>
+
+          <button 
+            className="save-btn" 
+            style={{ width: '100%', padding: 15, background: '#2ecc71', border: 'none', borderRadius: 8, fontWeight: 'bold' }}
+            onClick={() => {
+              setGameState('lobby');
+              setMatchData(null);
+            }}
+          >
+            Play Again
+          </button>
         </div>
-
-        <button 
-          className="save-btn" 
-          style={{ marginTop: 50, width: '100%', padding: 15 }}
-          onClick={() => {
-            setGameState('lobby');
-            setOpponent(null);
-           
-
-
-          }}
-        >
-          Play Again
-        </button>
-      </div>
-    );
-  }
+      );
+    }
   if (loading) return <div className="loading-container">Loading players...</div>;
 
   return (
