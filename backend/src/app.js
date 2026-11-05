@@ -884,24 +884,31 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
                   }
 
                   // EXECUTE PAYOUTS
-                  for (const player of playersInGame) {
-                      const prize = payouts[player.telegramId] || 0;
-                      if (prize > 0) {
-                          await BingoBord.updateOne({ telegramId: player.telegramId }, { $inc: { Wallet: prize } });
-                      }
+                 // EXECUTE PAYOUTS
+for (const player of playersInGame) {
+    const prize = payouts[player.telegramId] || 0;
+    if (prize > 0) {
+        await BingoBord.updateOne({ telegramId: player.telegramId }, { $inc: { Wallet: prize } });
+    }
 
-                      let rank = playersInGame.findIndex(p => p.telegramId === player.telegramId) + 1;
-                      
-                      io.to(player.socketId).emit("fpl_match_start", {
-                          roomId: stake,
-                          totalPlayers: playersInGame.length,
-                          myRank: rank,
-                          myPrize: prize,
-                          myUsername: player.username,
-                          winner: playersInGame[0],
-                          allScores: playersInGame.map(p => ({ username: p.username, score: p.totalScore }))
-                      });
-                  }
+    let rank = playersInGame.findIndex(p => p.telegramId === player.telegramId) + 1;
+    
+    // ✅ Fetch fresh wallet so frontend can show before/after
+    const freshUser = await BingoBord.findOne({ telegramId: player.telegramId });
+    
+    io.to(player.socketId).emit("fpl_match_start", {
+        roomId: stake,
+        totalPlayers: playersInGame.length,
+        myRank: rank,
+        myPrize: prize,
+        myUsername: player.username,
+        entryFee: stake,
+        walletBeforeMatch: freshUser.Wallet - prize,
+        walletAfterMatch: freshUser.Wallet,
+        winner: playersInGame[0],
+        allScores: playersInGame.map(p => ({ username: p.username, score: p.totalScore }))
+    });
+}
               }
           }, 1000);
         } else {

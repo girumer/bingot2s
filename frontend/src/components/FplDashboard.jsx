@@ -14,13 +14,12 @@ const getPosStyle = (pos) => {
 const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
 
 export default function FplDashboard() {
-    const [lobbies, setLobbies] = useState({ 10: 0, 20: 0, 50: 0 });
-    const [maxPrize, setMaxPrize] = useState(0);
-    const [countdown, setCountdown] = useState(null);
-    const [gameState, setGameState] = useState('lobby'); // 'lobby', 'building', 'waiting', 'matchup'
+  const [lobbies, setLobbies] = useState({ 10: 0, 20: 0, 50: 0 });
+  const [maxPrize, setMaxPrize] = useState(0);
+  const [countdown, setCountdown] = useState(null);
+  const [gameState, setGameState] = useState('lobby');
   const [roomStake, setRoomStake] = useState(null);
   const [matchData, setMatchData] = useState(null);
-  const [opponent, setOpponent] = useState(null);
   const [players, setPlayers] = useState([]);
   const [mySquad, setMySquad] = useState([]); 
   const [filterPos, setFilterPos] = useState(0); 
@@ -29,8 +28,9 @@ export default function FplDashboard() {
   const [tgId, setTgId] = useState(null);
   const [captainId, setCaptainId] = useState(null);
   const [showCaptainModal, setShowCaptainModal] = useState(false);
-  // Fetch Players on Load
-   useEffect(() => {
+
+  // 1. Fetch Players & Saved Squad on Load
+  useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
     if (initData) {
       try {
@@ -39,49 +39,40 @@ export default function FplDashboard() {
         
         if (user) {
           setTgId(user.id);
-          
-          // ✅ 1. Check if they have a saved squad
           axios.get(`${API_BASE}/api/fpl/myteam?telegramId=${user.id}`)
             .then(res => {
               if (res.data.fplSquad && res.data.fplSquad.length > 0) {
                 setMySquad(res.data.fplSquad);
                 setCaptainId(res.data.fplCaptainId);
-                setGameState('lobby'); // Go to Lobby because they have a team
+                setGameState('lobby');
               } else {
-                setGameState('building'); // Force building if no team
+                setGameState('building');
               }
             })
-            .catch(() => {
-              // If they don't have a team (404), send them to the builder
-              setGameState('building'); 
-            });
+            .catch(() => setGameState('building'));
         }
       } catch (e) {
-        console.error("Could not parse Telegram user data", e);
         setGameState('building');
       }
     }
 
-    // ✅ 2. Fetch the players data (always runs)
     axios.get(`${API_BASE}/api/fpl/bootstrap`)
       .then(res => {
         setPlayers(res.data.players || []);
         setLoading(false);
       })
       .catch(err => {
-        console.error(err);
         alert("Failed to load players");
         setLoading(false);
       });
   }, []);
-  // Listen for Match Found
-    useEffect(() => {
-    const handleMatchStart = (matchData) => {
-      const opp = matchData.player1.telegramId === tgId ? matchData.player2 : matchData.player1;
-      setOpponent(opp);
-      setMatchData(matchData);
+
+  // 2. Listen for Socket Events
+  useEffect(() => {
+    const handleMatchStart = (data) => {
+      setMatchData(data);
       setGameState('matchup');
-      setCountdown(null); // Reset countdown
+      setCountdown(null);
     };
 
     const handleError = (err) => {
@@ -89,26 +80,20 @@ export default function FplDashboard() {
       setGameState('lobby');
     };
 
-    const handleLobbyUpdate = (status) => {
-      setLobbies(status);
-    };
+    const handleLobbyUpdate = (status) => setLobbies(status);
 
-    // ✅ Listen for the countdown start
-        const handleMatchFound = (data) => {
+    const handleMatchFound = (data) => {
       setCountdown(data.timeLeft);
       if (data.maxPrize) setMaxPrize(data.maxPrize);
     };
 
-    // ✅ Listen for the ticking countdown
-    const handleCountdown = (time) => {
-      setCountdown(time);
-    };
+    const handleCountdown = (time) => setCountdown(time);
 
     socket.on("fpl_match_start", handleMatchStart);
     socket.on("fpl_error", handleError);
     socket.on("fpl_lobby_status", handleLobbyUpdate);
-    socket.on("fpl_match_found", handleMatchFound); // NEW
-    socket.on("fpl_countdown", handleCountdown);    // NEW
+    socket.on("fpl_match_found", handleMatchFound);
+    socket.on("fpl_countdown", handleCountdown);
 
     return () => {
       socket.off("fpl_match_start", handleMatchStart);
@@ -118,13 +103,13 @@ export default function FplDashboard() {
       socket.off("fpl_countdown", handleCountdown);
     };
   }, [tgId]);
-  // Calculate Budget & Positions
+
+  // Budget & Position Helpers
   const budget = 100.0;
-  const spent = mySquad.reduce((sum, id) => {/*  */
+  const spent = mySquad.reduce((sum, id) => {
     const p = players.find(x => x.id === id);
     return sum + (p ? Number(p.price) : 0);
   }, 0);
-
   const remainingBudget = (budget - spent).toFixed(1);
 
   const getPosCount = (posType) => {
@@ -134,10 +119,8 @@ export default function FplDashboard() {
     }).length;
   };
 
-  // Toggle Player Selection
   const togglePlayer = (player) => {
     const isSelected = mySquad.includes(player.id);
-
     if (isSelected) {
       setMySquad(mySquad.filter(id => id !== player.id));
     } else {
@@ -152,12 +135,9 @@ export default function FplDashboard() {
     }
   };
 
-  // Auto Pick Squad Logic
   const handleAutoPick = () => {
     let currentSquad = [];
     let currentSpent = 0;
-
-    // Pick top players by points within limits and budget
     const sorted = [...players].sort((a, b) => b.totalPoints - a.totalPoints);
     const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
 
@@ -171,436 +151,378 @@ export default function FplDashboard() {
       }
       if (currentSquad.length === 15) break;
     }
-
     setMySquad(currentSquad);
   };
 
-  // Clubs List for Dropdown
-  const clubs = useMemo(() => {
-    return Array.from(new Set(players.map(p => p.team))).filter(Boolean);
-  }, [players]);
+  const clubs = useMemo(() => Array.from(new Set(players.map(p => p.team))).filter(Boolean), [players]);
 
-  // Filtered Players
   const filteredPlayers = players.filter(p => {
     const matchesPos = filterPos === 0 || p.position === filterPos;
     const matchesClub = selectedClub === 'ALL' || p.team === selectedClub;
     return matchesPos && matchesClub;
   });
 
-    // Inside your existing handleSave function:
-    const handleSave = async () => {
+  const handleSave = async () => {
     if (mySquad.length !== 15) return alert(`Pick exactly 15 players. You have ${mySquad.length}.`);
     if (!captainId) return alert("Please select a Captain!");
     if (!tgId) return alert("Authentication error.");
 
     try {
-      // 1. Save to DB only
       await axios.post(`${API_BASE}/api/fpl/save-squad`, {
         telegramId: tgId,
         squadIds: mySquad,
         captainId: captainId
       });
-
       alert("Squad saved successfully! ✅");
-      setGameState('lobby'); // ✅ Go to Lobby instead of waiting
-      
+      setGameState('lobby');
     } catch (err) {
-      console.error(err);
       alert("Failed to save squad.");
     }
   };
-        if (gameState === 'lobby') {
-      const squadScore = mySquad.reduce((sum, id) => {
-        const p = players.find(x => x.id === id);
-        const pts = p ? p.totalPoints : 0;
-        return sum + (id === captainId ? pts * 2 : pts);
-      }, 0);
 
-      return (
-        <div className="fpl-app" style={{ padding: 20 }}>
-          <h2 style={{ color: 'white', textAlign: 'center' }}>⚽ FPL Multiplayer</h2>
-          
-          <div className="card" style={{ margin: '20px 0', textAlign: 'center', background: '#2c3547', padding: 15, borderRadius: 10 }}>
-            <h3>Your Squad is Ready!</h3>
-            <p style={{ color: '#2ecc71', fontSize: 20, fontWeight: 'bold' }}>{squadScore} Total Points</p>
-            <button className="action-btn" onClick={() => setGameState('building')}>
-              ✏️ Edit Team
-            </button>
-          </div>
+  // ==============================
+  // LOBBY VIEW
+  // ==============================
+  if (gameState === 'lobby') {
+    const squadScore = mySquad.reduce((sum, id) => {
+      const p = players.find(x => x.id === id);
+      const pts = p ? p.totalPoints : 0;
+      return sum + (id === captainId ? pts * 2 : pts);
+    }, 0);
 
-          <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 15 }}>
-            Select a room to play Head-to-Head:
-          </p>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-            {[10, 20, 50].map(stake => {
-  const waitingCount = lobbies[stake] || 0;
-  
-  return (
-    <button 
-      key={stake} 
-      className="save-btn" 
-      style={{ 
-        padding: 15, 
-        fontSize: 16, 
-        background: waitingCount > 0 ? '#e67e22' : '#2c3547', // Orange if waiting
-        color: 'white',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        border: '1px solid #4a5568',
-        borderRadius: 8
-      }}
-      onClick={() => {
-        setRoomStake(stake);
-        socket.emit("fpl_join_room", {
-          telegramId: tgId,
-          roomId: stake,
-          squadIds: mySquad,
-          captainId: captainId,
-          totalScore: squadScore
-        });
-        setGameState('waiting');
-      }}
-    >
-      <span>Room {stake} ETB</span>
-      {waitingCount > 0 ? (
-        <span style={{ fontSize: 13, background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: 4 }}>
-          👥 {waitingCount} waiting
-        </span>
-      ) : (
-        <span style={{ fontSize: 13, color: '#aaa' }}>Empty</span>
-      )}
-    </button>
-  );
-})}
-          </div>
+    return (
+      <div className="fpl-app" style={{ padding: 20 }}>
+        <h2 style={{ color: 'white', textAlign: 'center' }}>⚽ FPL Multiplayer</h2>
+        
+        <div className="card" style={{ margin: '20px 0', textAlign: 'center', background: '#2c3547', padding: 15, borderRadius: 10 }}>
+          <h3>Your Squad is Ready!</h3>
+          <p style={{ color: '#2ecc71', fontSize: 20, fontWeight: 'bold' }}>{squadScore} Total Points</p>
+          <button className="action-btn" onClick={() => setGameState('building')}>✏️ Edit Team</button>
         </div>
-      );
-    }
 
-   
-       if (gameState === 'waiting') {
-      return (
-        <div className="fpl-app" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: 20 }}>
-          
-          {/* LEAVE BUTTON AT TOP */}
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20 }}>
-            <button 
-              disabled={countdown !== null}
-              onClick={() => {
-                if (countdown !== null) return; 
-                socket.emit("fpl_cancel_match", { roomId: roomStake });
-                setGameState('lobby'); 
-                setCountdown(null);
-                setMaxPrize(0);
-              }}
-              style={{ 
-                background: countdown !== null ? '#7f8c8d' : '#e74c3c',
-                color: 'white', 
-                border: 'none', 
-                borderRadius: 6, 
-                padding: '8px 16px', 
-                fontWeight: 'bold', 
-                cursor: countdown !== null ? 'not-allowed' : 'pointer',
-                opacity: countdown !== null ? 0.5 : 1
-              }}
-            >
-              ← Leave
-            </button>
-          </div>
-
-          {/* CENTERED CONTENT */}
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, textAlign: 'center' }}>
-            
-            <h2 style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>
-              Room {roomStake} ETB
-            </h2>
-            
-            <p style={{ color: '#aaa', fontSize: 14, marginBottom: 30, maxWidth: 300 }}>
-              Your {roomStake} ETB is reserved.<br/>
-              As players join, the prize pool grows!
-            </p>
-
-            {/* LIVE MAX PRIZE DISPLAY */}
-            {countdown !== null && (
-              <div style={{ 
-                background: 'linear-gradient(135deg, #1e4d40, #0e2c23)', 
-                padding: '20px 40px', 
-                borderRadius: 15, 
-                border: '2px solid #2ecc71',
-                boxShadow: '0 0 20px rgba(46, 204, 113, 0.3)',
-                marginBottom: 30
-              }}>
-                <p style={{ color: '#a0aec0', margin: 0, fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>Current Max Prize</p>
-                <h1 style={{ color: '#2ecc71', margin: '5px 0 0 0', fontSize: 48, fontWeight: 'bold' }}>
-                  {maxPrize} <span style={{fontSize: 20}}>ETB</span>
-                </h1>
-              </div>
-            )}
-
-            {/* COUNTDOWN CIRCLE */}
-            {countdown !== null && (
-              <div style={{ background: '#2c3547', padding: 30, borderRadius: '50%', width: 100, height: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', border: '4px solid #e67e22' }}>
-                <span style={{ color: '#e67e22', fontSize: 40, fontWeight: 'bold' }}>{countdown}</span>
-              </div>
-            )}
-            
-            {countdown !== null && (
-              <p style={{ color: '#e67e22', marginTop: 20, fontWeight: 'bold' }}>Match Starting...</p>
-            )}
-
-          </div>
+        <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 15 }}>Select a room to play:</p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+          {[10, 20, 50].map(stake => {
+            const waitingCount = lobbies[stake] || 0;
+            return (
+              <button 
+                key={stake} className="save-btn" 
+                style={{ 
+                  padding: 15, fontSize: 16, 
+                  background: waitingCount > 0 ? '#e67e22' : '#2c3547',
+                  color: 'white', display: 'flex', justifyContent: 'space-between',
+                  alignItems: 'center', border: '1px solid #4a5568', borderRadius: 8
+                }}
+                onClick={() => {
+                  setRoomStake(stake);
+                  socket.emit("fpl_join_room", {
+                    telegramId: tgId, roomId: stake,
+                    squadIds: mySquad, captainId: captainId, totalScore: squadScore
+                  });
+                  setGameState('waiting');
+                }}
+              >
+                <span>Room {stake} ETB</span>
+                {waitingCount > 0 ? (
+                  <span style={{ fontSize: 13, background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: 4 }}>
+                    👥 {waitingCount} waiting
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 13, color: '#aaa' }}>Empty</span>
+                )}
+              </button>
+            );
+          })}
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-         if (gameState === 'matchup' && matchData) {
-      const { myRank, myPrize, allScores, totalPlayers, roomId, myUsername, winner } = matchData;
-      
-      // Calculate prizes for the leaderboard display
-      const totalPot = totalPlayers * Number(roomId);
-      let firstPrize = 0, secondPrize = 0, thirdPrize = 0;
-      
-      if (totalPlayers >= 10) {
-        firstPrize = Math.floor(totalPot * 0.40);
-        secondPrize = Math.floor(totalPot * 0.30);
-        thirdPrize = Math.floor(totalPot * 0.20);
-      } else {
-        firstPrize = Math.floor(totalPot * 0.90);
-      }
-
-      // Determine if I won
-      const iWon = myRank === 1;
-      const winnerName = winner?.username || "Unknown";
-
-      return (
-        <div className="fpl-app" style={{ padding: 20, display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center' }}>
-          
-          {/* 🏆 WINNER ANNOUNCEMENT BANNER */}
-          <div style={{ 
-            background: iWon ? 'linear-gradient(135deg, #f1c40f, #f39c12)' : '#2c3547', 
-            padding: 20, 
-            borderRadius: 15, 
-            textAlign: 'center',
-            marginBottom: 30,
-            boxShadow: iWon ? '0 0 30px rgba(241, 196, 15, 0.5)' : 'none',
-            border: '2px solid #1a1f2b'
-          }}>
-            <p style={{ color: iWon ? '#1a1f2b' : '#a0aec0', margin: 0, fontSize: 14, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1 }}>
-              {iWon ? "🎉 YOU WON! 🎉" : "WINNER"}
-            </p>
-            <h1 style={{ color: iWon ? '#1a1f2b' : '#f1c40f', margin: '10px 0', fontSize: 32, fontWeight: 'bold' }}>
-              @{winnerName}
-            </h1>
-            <p style={{ color: iWon ? '#1a1f2b' : '#a0aec0', margin: 0, fontSize: 18, fontWeight: 'bold' }}>
-              Won {firstPrize} ETB
-            </p>
-          </div>
-
-          {/* MY RESULT */}
-          <div style={{ textAlign: 'center', marginBottom: 30 }}>
-            <h3 style={{ color: 'white', margin: 0 }}>Your Rank: #{myRank}</h3>
-            {myPrize > 0 ? (
-              <p style={{ color: '#2ecc71', fontSize: 20, fontWeight: 'bold', margin: '5px 0' }}>
-                +{myPrize} ETB Added to Wallet
-              </p>
-            ) : (
-              <p style={{ color: '#e74c3c', fontSize: 16, margin: '5px 0' }}>
-                Better luck next time!
-              </p>
-            )}
-          </div>
-
-          {/* LEADERBOARD */}
-          <div style={{ background: '#2c3547', borderRadius: 10, padding: 15, marginBottom: 30 }}>
-            <h3 style={{ color: 'white', marginTop: 0, marginBottom: 15, borderBottom: '1px solid #4a5568', paddingBottom: 10 }}>
-              Final Rankings
-            </h3>
-            {allScores.map((score, index) => {
-              let rankIcon = `#${index + 1}`;
-              let rowColor = 'white';
-              let rowBg = 'transparent';
-              let prizeText = '';
-              const isMe = score.username === myUsername;
-
-              if (index === 0) {
-                rankIcon = '🥇';
-                rowColor = '#f1c40f';
-                rowBg = 'rgba(241, 196, 15, 0.1)';
-                prizeText = `+${firstPrize} ETB`;
-              } else if (index === 1 && totalPlayers >= 10) {
-                rankIcon = '🥈';
-                rowColor = '#bdc3c7';
-                rowBg = 'rgba(189, 195, 199, 0.1)';
-                prizeText = `+${secondPrize} ETB`;
-              } else if (index === 2 && totalPlayers >= 10) {
-                rankIcon = '🥉';
-                rowColor = '#cd7f32';
-                rowBg = 'rgba(205, 127, 50, 0.1)';
-                prizeText = `+${thirdPrize} ETB`;
-              }
-
-              const myBorder = isMe ? '2px solid #2ecc71' : 'none';
-
-              return (
-                <div key={index} style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  padding: '10px', 
-                  borderBottom: index !== allScores.length - 1 ? '1px solid #3e4c61' : 'none',
-                  background: rowBg,
-                  borderRadius: 6,
-                  marginBottom: 4,
-                  border: myBorder
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>{rankIcon}</span>
-                    <span style={{ color: isMe ? '#2ecc71' : rowColor, fontWeight: index === 0 || isMe ? 'bold' : 'normal', fontSize: 15 }}>
-                      {score.username} {isMe && "(You)"}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                    <span style={{ color: '#a0aec0', fontSize: 13 }}>
-                      {score.score} pts
-                    </span>
-                    {prizeText && (
-                      <span style={{ color: '#2ecc71', fontWeight: 'bold', fontSize: 14 }}>
-                        {prizeText}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
+  // ==============================
+  // WAITING VIEW
+  // ==============================
+  if (gameState === 'waiting') {
+    return (
+      <div className="fpl-app" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20 }}>
           <button 
-            className="save-btn" 
-            style={{ width: '100%', padding: 15, background: '#2ecc71', border: 'none', borderRadius: 8, fontWeight: 'bold' }}
+            disabled={countdown !== null}
             onClick={() => {
-              setGameState('lobby');
-              setMatchData(null);
+              if (countdown !== null) return; 
+              socket.emit("fpl_cancel_match", { roomId: roomStake });
+              setGameState('lobby'); 
+              setCountdown(null);
+              setMaxPrize(0);
+            }}
+            style={{ 
+              background: countdown !== null ? '#7f8c8d' : '#e74c3c',
+              color: 'white', border: 'none', borderRadius: 6, padding: '8px 16px',
+              fontWeight: 'bold', cursor: countdown !== null ? 'not-allowed' : 'pointer',
+              opacity: countdown !== null ? 0.5 : 1
             }}
           >
-            Play Again
+            ← Leave
           </button>
         </div>
-      );
+
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, textAlign: 'center' }}>
+          <h2 style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>Room {roomStake} ETB</h2>
+          <p style={{ color: '#aaa', fontSize: 14, marginBottom: 30, maxWidth: 300 }}>
+            Your {roomStake} ETB is reserved.<br/>As players join, the prize pool grows!
+          </p>
+
+          {countdown !== null && (
+            <div style={{ 
+              background: 'linear-gradient(135deg, #1e4d40, #0e2c23)', 
+              padding: '20px 40px', borderRadius: 15, border: '2px solid #2ecc71',
+              boxShadow: '0 0 20px rgba(46, 204, 113, 0.3)', marginBottom: 30
+            }}>
+              <p style={{ color: '#a0aec0', margin: 0, fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>Current Max Prize</p>
+              <h1 style={{ color: '#2ecc71', margin: '5px 0 0 0', fontSize: 48, fontWeight: 'bold' }}>
+                {maxPrize} <span style={{fontSize: 20}}>ETB</span>
+              </h1>
+            </div>
+          )}
+
+          {countdown !== null && (
+            <div style={{ background: '#2c3547', padding: 30, borderRadius: '50%', width: 100, height: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', border: '4px solid #e67e22' }}>
+              <span style={{ color: '#e67e22', fontSize: 40, fontWeight: 'bold' }}>{countdown}</span>
+            </div>
+          )}
+          {countdown !== null && <p style={{ color: '#e67e22', marginTop: 20, fontWeight: 'bold' }}>Match Starting...</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // ==============================
+  // MATCH RESULT VIEW
+  // ==============================
+  if (gameState === 'matchup' && matchData) {
+    const { myRank, myPrize, allScores, totalPlayers, roomId, myUsername, winner, entryFee, walletBeforeMatch, walletAfterMatch } = matchData;
+    
+    const totalPot = totalPlayers * Number(roomId);
+    let firstPrize = 0, secondPrize = 0, thirdPrize = 0;
+    if (totalPlayers >= 10) {
+      firstPrize = Math.floor(totalPot * 0.40);
+      secondPrize = Math.floor(totalPot * 0.30);
+      thirdPrize = Math.floor(totalPot * 0.20);
+    } else {
+      firstPrize = Math.floor(totalPot * 0.90);
     }
+
+    const iWon = myRank === 1;
+    const winnerName = winner?.username || "Unknown";
+    const walletBefore = Math.floor(walletBeforeMatch || 0);
+    const walletAfter = Math.floor(walletAfterMatch || 0);
+    const walletChange = walletAfter - walletBefore;
+
+    return (
+      <div className="fpl-app" style={{ padding: 20, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        {/* WINNER BANNER */}
+        <div style={{ 
+          background: iWon ? 'linear-gradient(135deg, #f1c40f, #f39c12)' : '#2c3547', 
+          padding: 20, borderRadius: 15, textAlign: 'center', marginBottom: 20,
+          boxShadow: iWon ? '0 0 30px rgba(241, 196, 15, 0.5)' : 'none',
+          border: '2px solid #1a1f2b'
+        }}>
+          <p style={{ color: iWon ? '#1a1f2b' : '#a0aec0', margin: 0, fontSize: 14, textTransform: 'uppercase', fontWeight: 'bold' }}>
+            {iWon ? "🎉 YOU WON! 🎉" : "WINNER"}
+          </p>
+          <h1 style={{ color: iWon ? '#1a1f2b' : '#f1c40f', margin: '10px 0', fontSize: 30 }}>@{winnerName}</h1>
+          <p style={{ color: iWon ? '#1a1f2b' : '#a0aec0', margin: 0, fontSize: 18, fontWeight: 'bold' }}>Won {firstPrize} ETB</p>
+        </div>
+
+        {/* WALLET UPDATE */}
+        <div style={{ 
+          background: '#2c3547', borderRadius: 12, padding: 20, marginBottom: 20,
+          border: `2px solid ${walletChange >= 0 ? '#2ecc71' : '#e74c3c'}`
+        }}>
+          <h3 style={{ color: 'white', margin: '0 0 15px 0', fontSize: 16 }}>💳 Wallet Update</h3>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #3e4c61' }}>
+            <span style={{ color: '#aaa' }}>Entry Fee Paid</span>
+            <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>-{entryFee} ETB</span>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #3e4c61' }}>
+            <span style={{ color: '#aaa' }}>Prize Won</span>
+            <span style={{ color: myPrize > 0 ? '#2ecc71' : '#aaa', fontWeight: 'bold' }}>
+              {myPrize > 0 ? `+${myPrize}` : '0'} ETB
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: 5 }}>
+            <span style={{ color: 'white', fontWeight: 'bold' }}>Net Change</span>
+            <span style={{ color: walletChange >= 0 ? '#2ecc71' : '#e74c3c', fontWeight: 'bold', fontSize: 18 }}>
+              {walletChange >= 0 ? '+' : ''}{walletChange} ETB
+            </span>
+          </div>
+          
+          <div style={{ 
+            background: '#1a1f2b', borderRadius: 8, padding: 12, marginTop: 10,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <span style={{ color: '#a0aec0', fontSize: 14 }}>New Balance</span>
+            <span style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>{walletAfter} ETB</span>
+          </div>
+        </div>
+
+        {/* LEADERBOARD */}
+        <div style={{ background: '#2c3547', borderRadius: 10, padding: 15, marginBottom: 20 }}>
+          <h3 style={{ color: 'white', marginTop: 0, marginBottom: 15, borderBottom: '1px solid #4a5568', paddingBottom: 10 }}>Final Rankings</h3>
+          {allScores.map((score, index) => {
+            let rankIcon = `#${index + 1}`;
+            let rowColor = 'white';
+            let rowBg = 'transparent';
+            let prizeText = '';
+            const isMe = score.username === myUsername;
+
+            if (index === 0) {
+              rankIcon = '🥇'; rowColor = '#f1c40f'; rowBg = 'rgba(241, 196, 15, 0.1)'; prizeText = `+${firstPrize} ETB`;
+            } else if (index === 1 && totalPlayers >= 10) {
+              rankIcon = '🥈'; rowColor = '#bdc3c7'; rowBg = 'rgba(189, 195, 199, 0.1)'; prizeText = `+${secondPrize} ETB`;
+            } else if (index === 2 && totalPlayers >= 10) {
+              rankIcon = '🥉'; rowColor = '#cd7f32'; rowBg = 'rgba(205, 127, 50, 0.1)'; prizeText = `+${thirdPrize} ETB`;
+            }
+
+            return (
+              <div key={index} style={{ 
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px', 
+                borderBottom: index !== allScores.length - 1 ? '1px solid #3e4c61' : 'none',
+                background: rowBg, borderRadius: 6, marginBottom: 4,
+                border: isMe ? '2px solid #2ecc71' : 'none'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 18 }}>{rankIcon}</span>
+                  <span style={{ color: isMe ? '#2ecc71' : rowColor, fontWeight: index === 0 || isMe ? 'bold' : 'normal' }}>
+                    {score.username} {isMe && "(You)"}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+                  <span style={{ color: '#a0aec0', fontSize: 13 }}>{score.score} pts</span>
+                  {prizeText && <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>{prizeText}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button 
+          className="save-btn" 
+          style={{ width: '100%', padding: 15, background: '#2ecc71', border: 'none', borderRadius: 8, fontWeight: 'bold' }}
+          onClick={() => { setGameState('lobby'); setMatchData(null); }}
+        >
+          Play Again
+        </button>
+      </div>
+    );
+  }
+
+  // ==============================
+  // SQUAD BUILDER VIEW
+  // ==============================
   if (loading) return <div className="loading-container">Loading players...</div>;
 
   return (
-  <div className="fpl-app">
-    {/* HEADER */}
-    <div className="fpl-header">
-      <div>
-        <h2>My Squad</h2>
-        <p>{mySquad.length}/15 · Budget: {remainingBudget} ETB left</p>
+    <div className="fpl-app">
+      <div className="fpl-header">
+        <div>
+          <h2>My Squad</h2>
+          <p>{mySquad.length}/15 · Budget: {remainingBudget} ETB left</p>
+        </div>
+        <button className="save-btn" onClick={handleSave}>Save</button>
       </div>
-      <button className="save-btn" onClick={handleSave}>Save</button>
-    </div>
 
-    {/* CONTROLS */}
-    <div className="controls">
-      <button className="pick-btn">⚽ Pick Players ({mySquad.length}/15)</button>
-           <button 
-    className="captain-text" 
-    style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-    onClick={() => {
-      if (mySquad.length !== 15) return alert("You must pick 15 players first!");
-      setShowCaptainModal(true);
-    }}
-  >
-    👑 Captain
-  </button>
-    </div>
+      <div className="controls">
+        <button className="pick-btn">⚽ Pick Players ({mySquad.length}/15)</button>
+        <button 
+          className="captain-text" 
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+          onClick={() => {
+            if (mySquad.length !== 15) return alert("You must pick 15 players first!");
+            setShowCaptainModal(true);
+          }}
+        >
+          👑 Captain
+        </button>
+      </div>
 
-    {/* POSITION COUNTERS */}
-    <div className="pos-counters">
-      <div className="pos-group">
-        {[1, 2, 3, 4].map(pos => {
-          const style = getPosStyle(pos);
+      <div className="pos-counters">
+        <div className="pos-group">
+          {[1, 2, 3, 4].map(pos => {
+            const style = getPosStyle(pos);
+            return (
+              <div key={pos} className="pos-item">
+                <div className="pos-label">{style.text}</div>
+                <div className="pos-val" style={{ color: getPosCount(pos) >= posLimits[pos] ? style.bg : '#fff' }}>
+                  {getPosCount(pos)}/{posLimits[pos]}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="action-buttons">
+          <button className="action-btn" onClick={() => { setMySquad([]); setCaptainId(null); }}>Reset</button>
+          <button className="action-btn" onClick={handleAutoPick}>Auto</button>
+        </div>
+      </div>
+
+      <div className="filters">
+        {['ALL', 'GK', 'DEF', 'MID', 'FWD'].map((label, idx) => (
+          <button
+            key={label}
+            className={`filter-btn ${filterPos === idx ? 'active' : ''}`}
+            onClick={() => setFilterPos(idx)}
+          >
+            {label}
+          </button>
+        ))}
+        <select className="club-select" value={selectedClub} onChange={(e) => setSelectedClub(e.target.value)}>
+          <option value="ALL">All Clubs</option>
+          {clubs.map(club => <option key={club} value={club}>{club}</option>)}
+        </select>
+      </div>
+
+      <div className="player-list">
+        {filteredPlayers.map(player => {
+          const isSelected = mySquad.includes(player.id);
+          const posStyle = getPosStyle(player.position);
+          
           return (
-            <div key={pos} className="pos-item">
-              <div className="pos-label">{style.text}</div>
-              <div className="pos-val" style={{ color: getPosCount(pos) >= posLimits[pos] ? style.bg : '#fff' }}>
-                {getPosCount(pos)}/{posLimits[pos]}
+            <div 
+              key={player.id} 
+              className={`player-row ${isSelected ? 'selected' : ''}`}
+              onClick={() => togglePlayer(player)}
+            >
+              <div className="player-left">
+                <div className="player-photo-wrapper">
+                  <img 
+                    src={player.photo} alt={player.name} className="player-photo"
+                    onError={(e) => { e.target.style.display = 'none'; }} 
+                  />
+                  <span className="player-badge" style={{ background: posStyle.bg }}>{posStyle.text}</span>
+                </div>
+                <div className="player-info">
+                  <div className="player-name">
+                    {player.name} {captainId === player.id && <span style={{ color: '#f1c40f' }}>(C)</span>}
+                  </div>
+                  <div className="player-team">{player.team}</div>
+                </div>
+              </div>
+
+              <div className="player-right">
+                <div className="player-points">★ {player.totalPoints}</div>
+                <div className="player-price">{player.price}</div>
+                <div className={`player-check ${isSelected ? 'selected' : ''}`}></div>
               </div>
             </div>
           );
         })}
       </div>
-      <div className="action-buttons">
-         <button className="action-btn" onClick={() => { setMySquad([]); setCaptainId(null); }}>Reset</button>
-        <button className="action-btn" onClick={handleAutoPick}>Auto</button>
-      </div>
-    </div>
 
-    {/* FILTERS */}
-    <div className="filters">
-      {['ALL', 'GK', 'DEF', 'MID', 'FWD'].map((label, idx) => (
-        <button
-          key={label}
-          className={`filter-btn ${filterPos === idx ? 'active' : ''}`}
-          onClick={() => setFilterPos(idx)}
-        >
-          {label}
-        </button>
-      ))}
-      <select 
-        className="club-select" 
-        value={selectedClub} 
-        onChange={(e) => setSelectedClub(e.target.value)}
-      >
-        <option value="ALL">All Clubs</option>
-        {clubs.map(club => (
-          <option key={club} value={club}>{club}</option>
-        ))}
-      </select>
-    </div>
-
-    {/* PLAYER LIST */}
-    <div className="player-list">
-      {filteredPlayers.map(player => {
-        const isSelected = mySquad.includes(player.id);
-        const posStyle = getPosStyle(player.position);
-        
-        return (
-          <div 
-            key={player.id} 
-            className={`player-row ${isSelected ? 'selected' : ''}`}
-            onClick={() => togglePlayer(player)}
-          >
-            <div className="player-left">
-              <div className="player-photo-wrapper">
-                <img 
-                  src={player.photo} 
-                  alt={player.name}
-                  className="player-photo"
-                  onError={(e) => { e.target.style.display = 'none'; }} 
-                />
-                <span className="player-badge" style={{ background: posStyle.bg }}>
-                  {posStyle.text}
-                </span>
-              </div>
-              <div className="player-info">
-                <div className="player-name">    {player.name} {captainId === player.id && <span style={{ color: '#f1c40f' }}>(C)</span>}</div>
-                <div className="player-team">{player.team}</div>
-              </div>
-            </div>
-
-            <div className="player-right">
-              <div className="player-points">★ {player.totalPoints}</div>
-              <div className="player-price">{player.price}</div>
-              <div className={`player-check ${isSelected ? 'selected' : ''}`}></div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-          {/* CAPTAIN MODAL */}
       {showCaptainModal && (
         <div className="modal-overlay" onClick={() => setShowCaptainModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -614,10 +536,7 @@ export default function FplDashboard() {
                   <div 
                     key={id} 
                     className={`player-row ${captainId === id ? 'selected' : ''}`}
-                    onClick={() => {
-                      setCaptainId(id);
-                      setShowCaptainModal(false);
-                    }}
+                    onClick={() => { setCaptainId(id); setShowCaptainModal(false); }}
                   >
                     <div className="player-left">
                       <img src={player.photo} className="player-photo" alt="" />
@@ -636,6 +555,6 @@ export default function FplDashboard() {
           </div>
         </div>
       )}
-  </div>
-);
+    </div>
+  );
 }
