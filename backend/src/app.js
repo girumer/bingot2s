@@ -549,11 +549,20 @@ setInterval(() => {
 // =========================================================================
 const rooms = {}; // rooms = { roomId: { players, selectedIndexes, playerCartelas, ... } }
  const fplRooms = { 10: null, 20: null, 50: null };
+   const broadcastFplLobbies = () => {
+    const status = {
+      10: fplRooms[10] ? { username: fplRooms[10].username, points: fplRooms[10].totalScore } : null,
+      20: fplRooms[20] ? { username: fplRooms[20].username, points: fplRooms[20].totalScore } : null,
+      50: fplRooms[50] ? { username: fplRooms[50].username, points: fplRooms[50].totalScore } : null,
+    };
+    io.emit("fpl_lobby_status", status); // Send to everyone
+  };
 const socketIdToClientId = new Map();
 const clientIdToSocketId = new Map();
 const authenticatedSockets = new Map();
  startRoomMonitor();
 io.on("connection", (socket) => {
+  
   //console.log("New connection:", socket.id);
 // Add this block inside your main io.on("connection", (socket) => { ... });
 
@@ -886,15 +895,20 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
 // Clean up FPL matchmaking queue if they disconnect while waiting
 
  /*  */
+ broadcastFplLobbies();
   });
- socket.on("fpl_cancel_match", ({ roomId }) => {
+
+   socket.on("fpl_cancel_match", async ({ roomId }) => {
     const stake = Number(roomId);
     if (fplRooms[stake] && fplRooms[stake].socketId === socket.id) {
+      const playerData = fplRooms[stake];
       fplRooms[stake] = null;
-      console.log(`[FPL WAITING] User cancelled match in room ${stake}`);
       
-      // OPTIONAL: Refund the user here if you want to give their money back for cancelling
-      // BingoBord.updateOne({ telegramId: ... }, { $inc: { Wallet: stake } });
+      // ✅ REFUND THE USER
+      await BingoBord.updateOne({ telegramId: playerData.telegramId }, { $inc: { Wallet: stake } });
+      
+      console.log(`[FPL WAITING] User cancelled and refunded ${stake} ETB`);
+      broadcastFplLobbies(); // ✅ Update lobbies
     }
   });
   // --- DISCONNECT ---
@@ -961,6 +975,7 @@ for (const stake in fplRooms) {
     console.log(`[FPL WAITING] User disconnected, removed from room ${stake} queue.`);
   }
 }
+broadcastFplLobbies();
   }, 15000);
 });
 });

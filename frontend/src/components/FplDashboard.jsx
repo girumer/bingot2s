@@ -14,6 +14,7 @@ const getPosStyle = (pos) => {
 const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
 
 export default function FplDashboard() {
+    const [lobbies, setLobbies] = useState({ 10: null, 20: null, 50: null });
     const [gameState, setGameState] = useState('lobby'); // 'lobby', 'building', 'waiting', 'matchup'
   const [roomStake, setRoomStake] = useState(null);
   const [matchData, setMatchData] = useState(null);
@@ -72,9 +73,8 @@ export default function FplDashboard() {
       });
   }, []);
   // Listen for Match Found
-  useEffect(() => {
+   useEffect(() => {
     const handleMatchStart = (matchData) => {
-      // Figure out who the opponent is
       const opp = matchData.player1.telegramId === tgId ? matchData.player2 : matchData.player1;
       setOpponent(opp);
       setMatchData(matchData);
@@ -83,16 +83,22 @@ export default function FplDashboard() {
 
     const handleError = (err) => {
       alert(err.message);
-       setGameState('lobby'); // Send them back to edit their team
+      setGameState('lobby');
+    };
+
+    // ✅ Listen for lobby updates
+    const handleLobbyUpdate = (status) => {
+      setLobbies(status);
     };
 
     socket.on("fpl_match_start", handleMatchStart);
     socket.on("fpl_error", handleError);
+    socket.on("fpl_lobby_status", handleLobbyUpdate);
 
-    // Cleanup when leaving the page
     return () => {
       socket.off("fpl_match_start", handleMatchStart);
       socket.off("fpl_error", handleError);
+      socket.off("fpl_lobby_status", handleLobbyUpdate);
     };
   }, [tgId]);
   // Calculate Budget & Positions
@@ -186,78 +192,102 @@ export default function FplDashboard() {
       alert("Failed to save squad.");
     }
   };
-    if (gameState === 'lobby') {
-    // Calculate the points of their saved squad
-    const squadScore = mySquad.reduce((sum, id) => {
-      const p = players.find(x => x.id === id);
-      const pts = p ? p.totalPoints : 0;
-      return sum + (id === captainId ? pts * 2 : pts);
-    }, 0);
+        if (gameState === 'lobby') {
+      const squadScore = mySquad.reduce((sum, id) => {
+        const p = players.find(x => x.id === id);
+        const pts = p ? p.totalPoints : 0;
+        return sum + (id === captainId ? pts * 2 : pts);
+      }, 0);
 
-    return (
-      <div className="fpl-app" style={{ padding: 20 }}>
-        <h2 style={{ color: 'white', textAlign: 'center' }}>⚽ FPL Multiplayer</h2>
-        
-        {/* Show saved squad info */}
-        <div className="card" style={{ margin: '20px 0', textAlign: 'center' }}>
-          <h3>Your Squad is Ready!</h3>
-          <p style={{ color: '#2ecc71', fontSize: 20, fontWeight: 'bold' }}>{squadScore} Total Points</p>
-          <button className="action-btn" onClick={() => setGameState('building')}>
-            ✏️ Edit Team
-          </button>
-        </div>
-
-        <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 15 }}>
-          Select a room to play Head-to-Head:
-        </p>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-          {[10, 20, 50].map(stake => (
-            <button 
-              key={stake} 
-              className="save-btn" 
-              style={{ padding: 20, fontSize: 18, background: '#2c3547', color: 'white' }}
-              onClick={() => {
-                setRoomStake(stake);
-                // ✅ Now we trigger the socket matchmaking directly!
-                socket.emit("fpl_join_room", {
-                  telegramId: tgId,
-                  roomId: stake,
-                  squadIds: mySquad,
-                  captainId: captainId,
-                  totalScore: squadScore // Send the pre-calculated score
-                });
-                setGameState('waiting');
-              }}
-            >
-              Join Room {stake} ETB
+      return (
+        <div className="fpl-app" style={{ padding: 20 }}>
+          <h2 style={{ color: 'white', textAlign: 'center' }}>⚽ FPL Multiplayer</h2>
+          
+          <div className="card" style={{ margin: '20px 0', textAlign: 'center', background: '#2c3547', padding: 15, borderRadius: 10 }}>
+            <h3>Your Squad is Ready!</h3>
+            <p style={{ color: '#2ecc71', fontSize: 20, fontWeight: 'bold' }}>{squadScore} Total Points</p>
+            <button className="action-btn" onClick={() => setGameState('building')}>
+              ✏️ Edit Team
             </button>
-          ))}
+          </div>
+
+          <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 15 }}>
+            Select a room to play Head-to-Head:
+          </p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+            {[10, 20, 50].map(stake => {
+              const waitingPlayer = lobbies[stake];
+              
+              return (
+                <button 
+                  key={stake} 
+                  className="save-btn" 
+                  style={{ 
+                    padding: 15, 
+                    fontSize: 16, 
+                    background: waitingPlayer ? '#e74c3c' : '#2c3547', 
+                    color: 'white',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    border: '1px solid #4a5568',
+                    borderRadius: 8
+                  }}
+                  onClick={() => {
+                    setRoomStake(stake);
+                    socket.emit("fpl_join_room", {
+                      telegramId: tgId,
+                      roomId: stake,
+                      squadIds: mySquad,
+                      captainId: captainId,
+                      totalScore: squadScore
+                    });
+                    setGameState('waiting');
+                  }}
+                >
+                  <span>Room {stake} ETB</span>
+                  {waitingPlayer ? (
+                    <span style={{ fontSize: 13, background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: 4 }}>
+                      ⏳ {waitingPlayer.username} waiting
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 13, color: '#aaa' }}>Empty</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    );
-  }
-   if (gameState === 'waiting') {
+      );
+    }
+
+   
+     if (gameState === 'waiting') {
     return (
-      <div className="fpl-app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', height: '100vh' }}>
-        <h2 style={{ color: 'white' }}>Searching for Opponent...</h2>
-        <p style={{ color: '#aaa' }}>Room Stake: {roomStake} ETB</p>
+      <div className="fpl-app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', height: '100vh', padding: 20 }}>
+        <h2 style={{ color: 'white' }}>Waiting in Room {roomStake}...</h2>
         
-        <div className="spinner" style={{ width: 50, height: 50, border: '5px solid #2c3547', borderTop: '5px solid #2ecc71', borderRadius: '50%', animation: 'spin 1s linear infinite', marginTop: 20 }}></div>
-        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        <p style={{ color: '#aaa', textAlign: 'center', marginTop: 10 }}>
+          Your {roomStake} ETB is reserved. <br/>
+          As soon as another player joins, the match will start automatically.
+        </p>
+
+        <div className="spinner" style={{ width: 50, height: 50, border: '5px solid #2c3547', borderTop: '5px solid #2ecc71', borderRadius: '50%', animation: 'spin 1s linear infinite', marginTop: 30, marginBottom: 30 }}></div>
         
         <button 
-          className="action-btn" 
-          style={{ marginTop: 40, padding: '12px 24px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold' }}
+          className="save-btn" 
+          style={{ background: '#e74c3c', width: '100%', maxWidth: 300, padding: 15 }}
           onClick={() => {
             socket.emit("fpl_cancel_match", { roomId: roomStake });
-            setGameState('lobby');
-            setMySquad([]);
-            setCaptainId(null);
+            // We set gameState to lobby, but we don't clear the squad!
+            setGameState('lobby'); 
           }}
         >
-          Cancel Search
+          Cancel & Refund {roomStake} ETB
         </button>
+        
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
