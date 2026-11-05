@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import "./FplDashboard.css";
-
+import socket from "../socket"; 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || '';
 
 const getPosStyle = (pos) => {
@@ -14,6 +14,10 @@ const getPosStyle = (pos) => {
 const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
 
 export default function FplDashboard() {
+    const [gameState, setGameState] = useState('lobby'); // 'lobby', 'building', 'waiting', 'matchup'
+  const [roomStake, setRoomStake] = useState(null);
+  const [matchData, setMatchData] = useState(null);
+  const [opponent, setOpponent] = useState(null);
   const [players, setPlayers] = useState([]);
   const [mySquad, setMySquad] = useState([]); 
   const [filterPos, setFilterPos] = useState(0); 
@@ -46,10 +50,33 @@ export default function FplDashboard() {
         setLoading(false);
       });
   }, []);
+  // Listen for Match Found
+  useEffect(() => {
+    const handleMatchStart = (matchData) => {
+      // Figure out who the opponent is
+      const opp = matchData.player1.telegramId === tgId ? matchData.player2 : matchData.player1;
+      setOpponent(opp);
+      setMatchData(matchData);
+      setGameState('matchup');
+    };
 
+    const handleError = (err) => {
+      alert(err.message);
+      setGameState('building'); // Send them back to edit their team
+    };
+
+    socket.on("fpl_match_start", handleMatchStart);
+    socket.on("fpl_error", handleError);
+
+    // Cleanup when leaving the page
+    return () => {
+      socket.off("fpl_match_start", handleMatchStart);
+      socket.off("fpl_error", handleError);
+    };
+  }, [tgId]);
   // Calculate Budget & Positions
   const budget = 100.0;
-  const spent = mySquad.reduce((sum, id) => {
+  const spent = mySquad.reduce((sum, id) => {/*  */
     const p = players.find(x => x.id === id);
     return sum + (p ? Number(p.price) : 0);
   }, 0);
@@ -116,34 +143,147 @@ export default function FplDashboard() {
     return matchesPos && matchesClub;
   });
 
+    // Inside your existing handleSave function:
   const handleSave = async () => {
-    if (mySquad.length !== 15) {
-      return alert(`You must pick exactly 15 players. You currently have ${mySquad.length}.`);
-    }
-    if (!tgId) {
-      return alert("Could not authenticate Telegram user.");
-    }
-    if (!captainId) {
-      return alert("Please select a Captain before saving!");
-    }
+    if (mySquad.length !== 15) return alert(`Pick exactly 15 players. You have ${mySquad.length}.`);
+    if (!captainId) return alert("Please select a Captain!");
+    if (!tgId) return alert("Authentication error.");
+
     try {
+      // 1. Save to DB first
       await axios.post(`${API_BASE}/api/fpl/save-squad`, {
         telegramId: tgId,
         squadIds: mySquad,
         captainId: captainId
       });
+
+      // 2. Tell Socket.io to join the room and wait for an opponent
+      // (Assuming you have imported your socket instance)
+          socket.emit("fpl_join_room", {
+        telegramId: tgId,
+        roomId: roomStake,
+        squadIds: mySquad,
+        captainId: captainId,
+        
+        // Send the calculated points to the backend!
+        totalScore: mySquad.reduce((sum, id) => {
+          const p = players.find(x => x.id === id);
+          const pts = p ? p.totalPoints : 0;
+          return sum + (id === captainId ? pts * 2 : pts);
+        }, 0)
+      });
+
+      setGameState('waiting');
       
-      if (window.Telegram?.WebApp?.showAlert) {
-        window.Telegram.WebApp.showAlert("Squad saved successfully! ✅");
-      } else {
-        alert("Squad saved successfully! ✅");
-      }
     } catch (err) {
       console.error(err);
-      alert("Failed to save squad. Please try again.");
+      alert("Failed to save squad. Do you have enough balance?");
     }
   };
+  if (gameState === 'lobby') {
+    return (
+      <div className="fpl-app" style={{ padding: 20 }}>
+        <h2 style={{ color: 'white', textAlign: 'center' }}>⚽ FPL Multiplayer</h2>
+        <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 30 }}>
+          Select a room to play Head-to-Head against another manager!
+        </p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+          {[10, 20, 50].map(stake => (
+            <button 
+              key={stake} 
+              className="save-btn" 
+              style={{ padding: 20, fontSize: 18, background: '#2c3547', color: 'white' }}
+              onClick={() => {
+                setRoomStake(stake);
+                setGameState('building');
+              }}
+            >
+              Join Room {stake} ETB
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+   if (gameState === 'waiting') {
+    return (
+      <div className="fpl-app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', height: '100vh' }}>
+        <h2 style={{ color: 'white' }}>Searching for Opponent...</h2>
+        <p style={{ color: '#aaa' }}>Room Stake: {roomStake} ETB</p>
+        
+        <div className="spinner" style={{ width: 50, height: 50, border: '5px solid #2c3547', borderTop: '5px solid #2ecc71', borderRadius: '50%', animation: 'spin 1s linear infinite', marginTop: 20 }}></div>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        
+        <button 
+          className="action-btn" 
+          style={{ marginTop: 40, padding: '12px 24px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold' }}
+          onClick={() => {
+            socket.emit("fpl_cancel_match", { roomId: roomStake });
+            setGameState('lobby');
+            setMySquad([]);
+            setCaptainId(null);
+          }}
+        >
+          Cancel Search
+        </button>
+      </div>
+    );
+  }
 
+    if (gameState === 'matchup' && opponent && matchData) {
+    // Determine if I won, lost, or drew based on the backend data
+    let resultText = "🤝 It's a Draw!";
+    let resultColor = "#f1c40f"; // Yellow
+    
+    // Note: we need to know who I am to check if I won
+    const myScore = matchData.player1.telegramId === tgId ? matchData.player1.totalScore : matchData.player2.totalScore;
+    const oppScore = matchData.player1.telegramId === tgId ? matchData.player2.totalScore : matchData.player1.totalScore;
+
+    if (matchData.winner) {
+      if (matchData.winner.telegramId === tgId) {
+        resultText = "🎉 You Won!";
+        resultColor = "#2ecc71"; // Green
+      } else {
+        resultText = "❌ You Lost.";
+        resultColor = "#e74c3c"; // Red
+      }
+    }
+
+    return (
+      <div className="fpl-app" style={{ padding: 20 }}>
+        <h2 style={{ color: 'white', textAlign: 'center' }}>⚔️ Match Result</h2>
+        
+        <h1 style={{ color: resultColor, textAlign: 'center', marginTop: 40, fontSize: 32 }}>
+          {resultText}
+        </h1>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 30 }}>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <h3 style={{ color: '#2ecc71' }}>You</h3>
+            <p style={{ color: 'white', fontSize: 24 }}>{myScore} pts</p>
+          </div>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <h3 style={{ color: '#e74c3c' }}>{opponent.username}</h3>
+            <p style={{ color: 'white', fontSize: 24 }}>{oppScore} pts</p>
+          </div>
+        </div>
+
+        <button 
+          className="save-btn" 
+          style={{ marginTop: 50, width: '100%', padding: 15 }}
+          onClick={() => {
+            setGameState('lobby');
+            setOpponent(null);
+            setMySquad([]);
+            setCaptainId(null);
+          }}
+        >
+          Play Again
+        </button>
+      </div>
+    );
+  }
   if (loading) return <div className="loading-container">Loading players...</div>;
 
   return (

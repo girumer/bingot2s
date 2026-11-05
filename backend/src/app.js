@@ -548,7 +548,7 @@ setInterval(() => {
 }, 1000);
 // =========================================================================
 const rooms = {}; // rooms = { roomId: { players, selectedIndexes, playerCartelas, ... } }
-
+ const fplRooms = { 10: null, 20: null, 50: null };
 const socketIdToClientId = new Map();
 const clientIdToSocketId = new Map();
 const authenticatedSockets = new Map();
@@ -790,8 +790,109 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
     checkWinners(roomId, number);
   });
 
+  // ==========================================
+  // FPL MULTIPLAYER MATCHMAKING
+  // ==========================================
+  // Tracks waiting players
 
+  socket.on("fpl_join_room", async ({ telegramId, roomId, squadIds, captainId, totalScore}) => {
+    try {
+      const stake = Number(roomId);
+      const user = await BingoBord.findOne({ telegramId: Number(telegramId) });
 
+      if (!user) {
+        socket.emit("fpl_error", { message: "User not found" });
+        return;
+      }
+
+      // 1. Check Wallet Balance
+      if (user.Wallet < stake) {
+        socket.emit("fpl_error", { message: `Insufficient balance. You need ${stake} ETB.` });
+        return;
+      }
+
+      // 2. Deduct Wallet
+      user.Wallet -= stake;
+      await user.save();
+
+      // 3. Add to Matchmaking Queue
+      const playerData = {
+        socketId: socket.id,
+        telegramId: user.telegramId,
+        username: user.username,
+        squadIds,
+        captainId,
+        totalScore
+      };
+      if (fplRooms[stake]) {
+        // MATCH FOUND!
+        const opponent = fplRooms[stake];
+        fplRooms[stake] = null; // Clear the queue
+
+        // ✅ CALCULATE WINNER HERE
+        let winner = null;
+        let isDraw = false;
+        
+        if (playerData.totalScore > opponent.totalScore) winner = playerData;
+        else if (opponent.totalScore > playerData.totalScore) winner = opponent;
+        else isDraw = true;
+
+        const matchData = {
+          roomId: stake,
+          player1: opponent,
+          player2: playerData,
+          winner,  // Send the winner object
+          isDraw
+        };
+
+        io.to(opponent.socketId).emit("fpl_match_start", matchData);
+        io.to(socket.id).emit("fpl_match_start", matchData);
+
+        console.log(`[FPL MATCH] Room ${stake}: ${opponent.username} (${opponent.totalScore} pts) vs ${user.username} (${playerData.totalScore} pts)`);
+                // 🏆 PAY THE WINNER INSTANTLY
+        if (winner) {
+            // Winner gets 180% of their stake (e.g., 10 ETB stake = 18 ETB win). 
+            // This leaves a 10% house edge for the platform (2 ETB profit).
+            const payout = stake * 1.8; 
+            await BingoBord.updateOne(
+                { telegramId: winner.telegramId },
+                { $inc: { Wallet: payout } }
+            );
+            console.log(`[FPL PAYOUT] Awarded ${payout} ETB to ${winner.username}`);
+        }
+     
+     
+      }
+      // Check if someone is already waiting in this room
+      else {
+        // NO OPPONENT YET: Add them to the queue
+        fplRooms[stake] = playerData;
+        socket.emit("fpl_waiting", { message: "Waiting for opponent..." });
+        
+        console.log(`[FPL WAITING] ${user.username} is waiting in room ${stake}`);
+      }/*  */
+
+    } catch (err) {
+      console.error("FPL Matchmaking Error:", err);
+      socket.emit("fpl_error", { message: "Server error during matchmaking." });
+    }/*  */
+    // Inside socket.on("disconnect", () => { ... })
+// Add this right after `authenticatedSockets.delete(socket.id);`
+
+// Clean up FPL matchmaking queue if they disconnect while waiting
+
+ /*  */
+  });
+ socket.on("fpl_cancel_match", ({ roomId }) => {
+    const stake = Number(roomId);
+    if (fplRooms[stake] && fplRooms[stake].socketId === socket.id) {
+      fplRooms[stake] = null;
+      console.log(`[FPL WAITING] User cancelled match in room ${stake}`);
+      
+      // OPTIONAL: Refund the user here if you want to give their money back for cancelling
+      // BingoBord.updateOne({ telegramId: ... }, { $inc: { Wallet: stake } });
+    }
+  });
   // --- DISCONNECT ---
 // --- DISCONNECT ---
 // --- DISCONNECT ---
@@ -850,7 +951,12 @@ socket.on("disconnect", () => {
 
       break;
     }
-
+for (const stake in fplRooms) {
+  if (fplRooms[stake] && fplRooms[stake].socketId === socket.id) {
+    fplRooms[stake] = null;
+    console.log(`[FPL WAITING] User disconnected, removed from room ${stake} queue.`);
+  }
+}
   }, 15000);
 });
 });
