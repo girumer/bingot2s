@@ -805,119 +805,151 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
   // ==========================================
   // Tracks waiting players
 
-   socket.on("fpl_join_room", async ({ telegramId, roomId, squadIds, captainId, totalScore}) => {
-  try {
-    const stake = Number(roomId);
-    const user = await BingoBord.findOne({ telegramId: Number(telegramId) });
+  socket.on("fpl_join_room", async ({ telegramId, roomId, squadIds, captainId, totalScore}) => {
+    try {
+      const stake = Number(roomId);
+      const user = await BingoBord.findOne({ telegramId: Number(telegramId) });
 
-    if (!user) return socket.emit("fpl_error", { message: "User not found" });
-    if (user.Wallet < stake) return socket.emit("fpl_error", { message: `Insufficient balance. You need ${stake} ETB.` });
+      if (!user) return socket.emit("fpl_error", { message: "User not found" });
+      if (user.Wallet < stake) return socket.emit("fpl_error", { message: `Insufficient balance. You need ${stake} ETB.` });
 
-    // Check if the user is already in this queue
-    const alreadyInQueue = fplRooms[stake].find(p => p.telegramId === user.telegramId);
-    if (alreadyInQueue) {
-      return socket.emit("fpl_error", { message: "You are already in this queue." });
-    }
+      const alreadyInQueue = fplRooms[stake].find(p => p.telegramId === user.telegramId);
+      if (alreadyInQueue) return socket.emit("fpl_error", { message: "You are already in this queue." });
 
-    // Deduct Wallet
-    user.Wallet -= stake;
-    await user.save();
+      user.Wallet -= stake;
+      await user.save();
 
-    const playerData = {
-      socketId: socket.id,
-      telegramId: user.telegramId,
-      username: user.username,
-      squadIds,
-      captainId,
-      totalScore
-    };
+      const playerData = {
+        socketId: socket.id,
+        telegramId: user.telegramId,
+        username: user.username,
+        squadIds,
+        captainId,
+        totalScore
+      };
 
-    // Add player to the waiting array
-    fplRooms[stake].push(playerData);
-    socket.emit("fpl_waiting", { message: "Waiting for opponent..." });
-    broadcastFplLobbies();
-
-    // If there are 2 or more players in the queue, start the match!
-    if (fplRooms[stake].length >= 2) {
-      
-      // Take the first 2 players
-      const [p1, p2] = fplRooms[stake];
-      
-      // Remove them from the queue
-      fplRooms[stake] = fplRooms[stake].slice(2);
+      fplRooms[stake].push(playerData);
+      socket.emit("fpl_waiting", { message: "Waiting for opponent..." });
       broadcastFplLobbies();
 
-      // Save the match data in the timer object
-      fplTimers[stake] = { players: [p1, p2], timeLeft: 30 };
+      // 🕒 START OR UPDATE THE TIMER
+      if (!fplTimers[stake]) {
+        // First player joined, start the timer
+        fplTimers[stake] = { timeLeft: 30 };
+        
+        fplTimers[stake].interval = setInterval(async () => {
+            fplTimers[stake].timeLeft -= 1;
+            const time = fplTimers[stake].timeLeft;
 
-      // Tell both players to show the countdown UI
-      io.to(p1.socketId).emit("fpl_match_found", { timeLeft: 30 });
-      io.to(p2.socketId).emit("fpl_match_found", { timeLeft: 30 });
+            // 🔥 CALCULATE CURRENT MAX PRIZE
+            const currentPlayers = fplRooms[stake].length;
+            const totalPot = currentPlayers * stake;
+            let maxPrize = 0;
+            if (currentPlayers >= 10) {
+               maxPrize = Math.floor(totalPot * 0.40); // 1st place gets 40%
+            } else if (currentPlayers >= 2) {
+               maxPrize = Math.floor(totalPot * 0.90); // 1st place gets 90%
+            }
 
-      // Start the countdown
-      const countdownInterval = setInterval(async () => {
-        if (!fplTimers[stake]) {
-          clearInterval(countdownInterval);
-          return;
-        }
+            // Send countdown AND max prize to everyone waiting
+            fplRooms[stake].forEach(p => {
+                io.to(p.socketId).emit("fpl_match_found", { timeLeft: time, maxPrize: maxPrize });
+            });
 
-        fplTimers[stake].timeLeft -= 1;
-        const time = fplTimers[stake].timeLeft;
+            // When timer hits 0, START THE GAME
+            if (time <= 0) {
+                clearInterval(fplTimers[stake].interval);
+                
+                const playersInGame = [...fplRooms[stake]];
+                fplRooms[stake] = []; 
+                fplTimers[stake] = null; 
+                broadcastFplLobbies();
 
-        io.to(p1.socketId).emit("fpl_countdown", time);
-        io.to(p2.socketId).emit("fpl_countdown", time);
+                if (playersInGame.length === 0) return;
 
-        if (time <= 0) {
-          clearInterval(countdownInterval);
-          
-          // 🏆 CALCULATE WINNER
-          let winner = null;
-          let isDraw = false;
-          if (p1.totalScore > p2.totalScore) winner = p1;
-          else if (p2.totalScore > p1.totalScore) winner = p2;
-          else isDraw = true;
+                // 🏆 SORT PLAYERS BY SCORE
+                playersInGame.sort((a, b) => b.totalScore - a.totalScore);
 
-          const matchData = { roomId: stake, player1: p1, player2: p2, winner, isDraw };
-          io.to(p1.socketId).emit("fpl_match_start", matchData);
-          io.to(p2.socketId).emit("fpl_match_start", matchData);
+                const finalTotalPot = playersInGame.length * stake;
+                let payouts = {};
 
-          // Payouts
-          if (winner) {
-            const payout = stake * 1.8;
-            await BingoBord.updateOne({ telegramId: winner.telegramId }, { $inc: { Wallet: payout } });
-          } else if (isDraw) {
-            await BingoBord.updateOne({ telegramId: p1.telegramId }, { $inc: { Wallet: stake } });
-            await BingoBord.updateOne({ telegramId: p2.telegramId }, { $inc: { Wallet: stake } });
-          }
+                // 💰 CALCULATE FINAL PAYOUTS BASED ON THRESHOLD
+                if (playersInGame.length === 1) {
+                    payouts[playersInGame[0].telegramId] = stake; // Refund if alone
+                } 
+                else if (playersInGame.length < 10) {
+                    // Less than 10 players: Winner takes 90%
+                    const winnerPrize = Math.floor(finalTotalPot * 0.90);
+                    payouts[playersInGame[0].telegramId] = winnerPrize;
+                } 
+                else {
+                    // 10 or more players: 40%, 30%, 20%
+                    payouts[playersInGame[0].telegramId] = Math.floor(finalTotalPot * 0.40);
+                    payouts[playersInGame[1].telegramId] = Math.floor(finalTotalPot * 0.30);
+                    if (playersInGame[2]) {
+                        payouts[playersInGame[2].telegramId] = Math.floor(finalTotalPot * 0.20);
+                    }
+                }
 
-          fplTimers[stake] = null;
-        }
-      }, 1000);
+                // 💸 EXECUTE PAYOUTS & SEND RESULTS
+                for (const player of playersInGame) {
+                    const prize = payouts[player.telegramId] || 0;
+                    if (prize > 0) {
+                        await BingoBord.updateOne({ telegramId: player.telegramId }, { $inc: { Wallet: prize } });
+                    }
+
+                    let rank = playersInGame.findIndex(p => p.telegramId === player.telegramId) + 1;
+                    
+                    io.to(player.socketId).emit("fpl_match_start", {
+                        roomId: stake,
+                        totalPlayers: playersInGame.length,
+                        myRank: rank,
+                        myPrize: prize,
+                        winner: playersInGame[0],
+                        allScores: playersInGame.map(p => ({ username: p.username, score: p.totalScore }))
+                    });
+                }
+            }
+        }, 1000);
+      } else {
+        // Someone else joined mid-countdown. Instantly send them the current state.
+        const timeLeft = fplTimers[stake].timeLeft;
+        const currentPlayers = fplRooms[stake].length;
+        const totalPot = currentPlayers * stake;
+        let maxPrize = currentPlayers >= 10 ? Math.floor(totalPot * 0.40) : Math.floor(totalPot * 0.90);
+        
+        socket.emit("fpl_match_found", { timeLeft: timeLeft, maxPrize: maxPrize });
+      }
+
+    } catch (err) {
+      console.error("FPL Matchmaking Error:", err);
+      socket.emit("fpl_error", { message: "Server error during matchmaking." });
     }
-
-  } catch (err) {
-    console.error("FPL Matchmaking Error:", err);
-    socket.emit("fpl_error", { message: "Server error during matchmaking." });
-  }
-});
+  });
 
   socket.on("fpl_cancel_match", async ({ roomId }) => {
-  const stake = Number(roomId);
-  const playerIndex = fplRooms[stake].findIndex(p => p.socketId === socket.id);
-  
-  if (playerIndex !== -1) {
-    const playerData = fplRooms[stake][playerIndex];
+    const stake = Number(roomId);
     
-    // Remove from array
-    fplRooms[stake].splice(playerIndex, 1);
+    // ✅ 1. BLOCK CANCELLATION IF MATCH IS IN COUNTDOWN
+    if (fplTimers[stake]) {
+      return socket.emit("fpl_error", { message: "Match is already starting! You cannot leave now." });
+    }
+
+    const playerIndex = fplRooms[stake].findIndex(p => p.socketId === socket.id);
     
-    // ✅ REFUND THE USER
-    await BingoBord.updateOne({ telegramId: playerData.telegramId }, { $inc: { Wallet: stake } });
-    
-    console.log(`[FPL WAITING] User cancelled and refunded ${stake} ETB`);
-    broadcastFplLobbies();
-  }
-});
+    if (playerIndex !== -1) {
+      const playerData = fplRooms[stake][playerIndex];
+      
+      // Remove from array
+      fplRooms[stake].splice(playerIndex, 1);
+      
+      // ✅ REFUND THE USER
+      await BingoBord.updateOne({ telegramId: playerData.telegramId }, { $inc: { Wallet: stake } });
+      
+      console.log(`[FPL WAITING] User cancelled and refunded ${stake} ETB`);
+      broadcastFplLobbies();
+    }
+  });
   // --- DISCONNECT ---
 // --- DISCONNECT ---
 // --- DISCONNECT ---

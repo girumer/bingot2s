@@ -15,6 +15,7 @@ const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
 
 export default function FplDashboard() {
     const [lobbies, setLobbies] = useState({ 10: 0, 20: 0, 50: 0 });
+    const [maxPrize, setMaxPrize] = useState(0);
     const [countdown, setCountdown] = useState(null);
     const [gameState, setGameState] = useState('lobby'); // 'lobby', 'building', 'waiting', 'matchup'
   const [roomStake, setRoomStake] = useState(null);
@@ -93,8 +94,9 @@ export default function FplDashboard() {
     };
 
     // ✅ Listen for the countdown start
-    const handleMatchFound = ({ timeLeft }) => {
-      setCountdown(timeLeft);
+        const handleMatchFound = (data) => {
+      setCountdown(data.timeLeft);
+      if (data.maxPrize) setMaxPrize(data.maxPrize);
     };
 
     // ✅ Listen for the ticking countdown
@@ -278,18 +280,31 @@ export default function FplDashboard() {
     }
 
    
-      if (gameState === 'waiting') {
+       if (gameState === 'waiting') {
       return (
         <div className="fpl-app" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: 20 }}>
+          
           {/* LEAVE BUTTON AT TOP */}
           <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20 }}>
             <button 
+              disabled={countdown !== null}
               onClick={() => {
+                if (countdown !== null) return; 
                 socket.emit("fpl_cancel_match", { roomId: roomStake });
                 setGameState('lobby'); 
                 setCountdown(null);
+                setMaxPrize(0);
               }}
-              style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: 6, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' }}
+              style={{ 
+                background: countdown !== null ? '#7f8c8d' : '#e74c3c',
+                color: 'white', 
+                border: 'none', 
+                borderRadius: 6, 
+                padding: '8px 16px', 
+                fontWeight: 'bold', 
+                cursor: countdown !== null ? 'not-allowed' : 'pointer',
+                opacity: countdown !== null ? 0.5 : 1
+              }}
             >
               ← Leave
             </button>
@@ -299,23 +314,40 @@ export default function FplDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, textAlign: 'center' }}>
             
             <h2 style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>
-              Waiting in Room {roomStake} ETB
+              Room {roomStake} ETB
             </h2>
             
-            <p style={{ color: '#aaa', fontSize: 16, marginBottom: 40, maxWidth: 300 }}>
+            <p style={{ color: '#aaa', fontSize: 14, marginBottom: 30, maxWidth: 300 }}>
               Your {roomStake} ETB is reserved.<br/>
-              As soon as another player joins, the match will start automatically.
+              As players join, the prize pool grows!
             </p>
 
-            {/* SHOW COUNTDOWN IF OPPONENT FOUND */}
+            {/* LIVE MAX PRIZE DISPLAY */}
             {countdown !== null && (
-              <div style={{ background: '#2c3547', padding: 30, borderRadius: '50%', width: 120, height: 120, display: 'flex', justifyContent: 'center', alignItems: 'center', border: '4px solid #2ecc71' }}>
-                <span style={{ color: '#2ecc71', fontSize: 48, fontWeight: 'bold' }}>{countdown}</span>
+              <div style={{ 
+                background: 'linear-gradient(135deg, #1e4d40, #0e2c23)', 
+                padding: '20px 40px', 
+                borderRadius: 15, 
+                border: '2px solid #2ecc71',
+                boxShadow: '0 0 20px rgba(46, 204, 113, 0.3)',
+                marginBottom: 30
+              }}>
+                <p style={{ color: '#a0aec0', margin: 0, fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>Current Max Prize</p>
+                <h1 style={{ color: '#2ecc71', margin: '5px 0 0 0', fontSize: 48, fontWeight: 'bold' }}>
+                  {maxPrize} <span style={{fontSize: 20}}>ETB</span>
+                </h1>
+              </div>
+            )}
+
+            {/* COUNTDOWN CIRCLE */}
+            {countdown !== null && (
+              <div style={{ background: '#2c3547', padding: 30, borderRadius: '50%', width: 100, height: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', border: '4px solid #e67e22' }}>
+                <span style={{ color: '#e67e22', fontSize: 40, fontWeight: 'bold' }}>{countdown}</span>
               </div>
             )}
             
             {countdown !== null && (
-              <p style={{ color: '#2ecc71', marginTop: 20, fontWeight: 'bold' }}>Opponent Found! Starting...</p>
+              <p style={{ color: '#e67e22', marginTop: 20, fontWeight: 'bold' }}>Match Starting...</p>
             )}
 
           </div>
