@@ -14,7 +14,8 @@ const getPosStyle = (pos) => {
 const posLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
 
 export default function FplDashboard() {
-    const [lobbies, setLobbies] = useState({ 10: null, 20: null, 50: null });
+    const [lobbies, setLobbies] = useState({ 10: 0, 20: 0, 50: 0 });
+    const [countdown, setCountdown] = useState(null);
     const [gameState, setGameState] = useState('lobby'); // 'lobby', 'building', 'waiting', 'matchup'
   const [roomStake, setRoomStake] = useState(null);
   const [matchData, setMatchData] = useState(null);
@@ -73,12 +74,13 @@ export default function FplDashboard() {
       });
   }, []);
   // Listen for Match Found
-   useEffect(() => {
+    useEffect(() => {
     const handleMatchStart = (matchData) => {
       const opp = matchData.player1.telegramId === tgId ? matchData.player2 : matchData.player1;
       setOpponent(opp);
       setMatchData(matchData);
       setGameState('matchup');
+      setCountdown(null); // Reset countdown
     };
 
     const handleError = (err) => {
@@ -86,19 +88,32 @@ export default function FplDashboard() {
       setGameState('lobby');
     };
 
-    // ✅ Listen for lobby updates
     const handleLobbyUpdate = (status) => {
       setLobbies(status);
+    };
+
+    // ✅ Listen for the countdown start
+    const handleMatchFound = ({ timeLeft }) => {
+      setCountdown(timeLeft);
+    };
+
+    // ✅ Listen for the ticking countdown
+    const handleCountdown = (time) => {
+      setCountdown(time);
     };
 
     socket.on("fpl_match_start", handleMatchStart);
     socket.on("fpl_error", handleError);
     socket.on("fpl_lobby_status", handleLobbyUpdate);
+    socket.on("fpl_match_found", handleMatchFound); // NEW
+    socket.on("fpl_countdown", handleCountdown);    // NEW
 
     return () => {
       socket.off("fpl_match_start", handleMatchStart);
       socket.off("fpl_error", handleError);
       socket.off("fpl_lobby_status", handleLobbyUpdate);
+      socket.off("fpl_match_found", handleMatchFound);
+      socket.off("fpl_countdown", handleCountdown);
     };
   }, [tgId]);
   // Calculate Budget & Positions
@@ -217,80 +232,96 @@ export default function FplDashboard() {
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
             {[10, 20, 50].map(stake => {
-              const waitingPlayer = lobbies[stake];
-              
-              return (
-                <button 
-                  key={stake} 
-                  className="save-btn" 
-                  style={{ 
-                    padding: 15, 
-                    fontSize: 16, 
-                    background: waitingPlayer ? '#e74c3c' : '#2c3547', 
-                    color: 'white',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    border: '1px solid #4a5568',
-                    borderRadius: 8
-                  }}
-                  onClick={() => {
-                    setRoomStake(stake);
-                    socket.emit("fpl_join_room", {
-                      telegramId: tgId,
-                      roomId: stake,
-                      squadIds: mySquad,
-                      captainId: captainId,
-                      totalScore: squadScore
-                    });
-                    setGameState('waiting');
-                  }}
-                >
-                  <span>Room {stake} ETB</span>
-                  {waitingPlayer ? (
-                    <span style={{ fontSize: 13, background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: 4 }}>
-                      ⏳ {waitingPlayer.username} waiting
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: 13, color: '#aaa' }}>Empty</span>
-                  )}
-                </button>
-              );
-            })}
+  const waitingCount = lobbies[stake] || 0;
+  
+  return (
+    <button 
+      key={stake} 
+      className="save-btn" 
+      style={{ 
+        padding: 15, 
+        fontSize: 16, 
+        background: waitingCount > 0 ? '#e67e22' : '#2c3547', // Orange if waiting
+        color: 'white',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        border: '1px solid #4a5568',
+        borderRadius: 8
+      }}
+      onClick={() => {
+        setRoomStake(stake);
+        socket.emit("fpl_join_room", {
+          telegramId: tgId,
+          roomId: stake,
+          squadIds: mySquad,
+          captainId: captainId,
+          totalScore: squadScore
+        });
+        setGameState('waiting');
+      }}
+    >
+      <span>Room {stake} ETB</span>
+      {waitingCount > 0 ? (
+        <span style={{ fontSize: 13, background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: 4 }}>
+          👥 {waitingCount} waiting
+        </span>
+      ) : (
+        <span style={{ fontSize: 13, color: '#aaa' }}>Empty</span>
+      )}
+    </button>
+  );
+})}
           </div>
         </div>
       );
     }
 
    
-     if (gameState === 'waiting') {
-    return (
-      <div className="fpl-app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', height: '100vh', padding: 20 }}>
-        <h2 style={{ color: 'white' }}>Waiting in Room {roomStake}...</h2>
-        
-        <p style={{ color: '#aaa', textAlign: 'center', marginTop: 10 }}>
-          Your {roomStake} ETB is reserved. <br/>
-          As soon as another player joins, the match will start automatically.
-        </p>
+      if (gameState === 'waiting') {
+      return (
+        <div className="fpl-app" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: 20 }}>
+          {/* LEAVE BUTTON AT TOP */}
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20 }}>
+            <button 
+              onClick={() => {
+                socket.emit("fpl_cancel_match", { roomId: roomStake });
+                setGameState('lobby'); 
+                setCountdown(null);
+              }}
+              style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: 6, padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              ← Leave
+            </button>
+          </div>
 
-        <div className="spinner" style={{ width: 50, height: 50, border: '5px solid #2c3547', borderTop: '5px solid #2ecc71', borderRadius: '50%', animation: 'spin 1s linear infinite', marginTop: 30, marginBottom: 30 }}></div>
-        
-        <button 
-          className="save-btn" 
-          style={{ background: '#e74c3c', width: '100%', maxWidth: 300, padding: 15 }}
-          onClick={() => {
-            socket.emit("fpl_cancel_match", { roomId: roomStake });
-            // We set gameState to lobby, but we don't clear the squad!
-            setGameState('lobby'); 
-          }}
-        >
-          Cancel & Refund {roomStake} ETB
-        </button>
-        
-        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
+          {/* CENTERED CONTENT */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, textAlign: 'center' }}>
+            
+            <h2 style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>
+              Waiting in Room {roomStake} ETB
+            </h2>
+            
+            <p style={{ color: '#aaa', fontSize: 16, marginBottom: 40, maxWidth: 300 }}>
+              Your {roomStake} ETB is reserved.<br/>
+              As soon as another player joins, the match will start automatically.
+            </p>
+
+            {/* SHOW COUNTDOWN IF OPPONENT FOUND */}
+            {countdown !== null && (
+              <div style={{ background: '#2c3547', padding: 30, borderRadius: '50%', width: 120, height: 120, display: 'flex', justifyContent: 'center', alignItems: 'center', border: '4px solid #2ecc71' }}>
+                <span style={{ color: '#2ecc71', fontSize: 48, fontWeight: 'bold' }}>{countdown}</span>
+              </div>
+            )}
+            
+            {countdown !== null && (
+              <p style={{ color: '#2ecc71', marginTop: 20, fontWeight: 'bold' }}>Opponent Found! Starting...</p>
+            )}
+
+          </div>
+        </div>
+      );
+    }
 
     if (gameState === 'matchup' && opponent && matchData) {
     // Determine if I won, lost, or drew based on the backend data
