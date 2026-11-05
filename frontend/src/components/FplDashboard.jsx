@@ -355,10 +355,10 @@ export default function FplDashboard() {
       );
     }
 
-       if (gameState === 'matchup' && matchData) {
-      const { myRank, myPrize, allScores, totalPlayers, roomId, myUsername } = matchData;
+         if (gameState === 'matchup' && matchData) {
+      const { myRank, myPrize, allScores, totalPlayers, roomId, myUsername, winner } = matchData;
       
-      // Calculate prizes for the leaderboard display (matches the backend logic)
+      // Calculate prizes for the leaderboard display
       const totalPot = totalPlayers * Number(roomId);
       let firstPrize = 0, secondPrize = 0, thirdPrize = 0;
       
@@ -370,48 +370,52 @@ export default function FplDashboard() {
         firstPrize = Math.floor(totalPot * 0.90);
       }
 
-      let resultText = "";
-      let resultColor = "";
-
-      if (myRank === 1) {
-        resultText = "🥇 You Won 1st Place!";
-        resultColor = "#f1c40f";
-      } else if (myRank === 2) {
-        resultText = "🥈 You Won 2nd Place!";
-        resultColor = "#bdc3c7";
-      } else if (myRank === 3) {
-        resultText = "🥉 You Won 3rd Place!";
-        resultColor = "#cd7f32";
-      } else {
-        resultText = "❌ You Didn't Place.";
-        resultColor = "#e74c3c";
-      }
+      // Determine if I won
+      const iWon = myRank === 1;
+      const winnerName = winner?.username || "Unknown";
 
       return (
-        <div className="fpl-app" style={{ padding: 20 }}>
-          <h2 style={{ color: 'white', textAlign: 'center' }}>⚔️ Tournament Results</h2>
-          <p style={{ color: '#aaa', textAlign: 'center', marginBottom: 20 }}>
-            {totalPlayers} Players Competed in Room {roomId} ETB
-          </p>
+        <div className="fpl-app" style={{ padding: 20, display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center' }}>
           
-          <h1 style={{ color: resultColor, textAlign: 'center', fontSize: 28, marginBottom: 10 }}>
-            {resultText}
-          </h1>
-          
-          {myPrize > 0 ? (
-            <p style={{ color: '#2ecc71', textAlign: 'center', fontSize: 22, fontWeight: 'bold', marginBottom: 30 }}>
-              +{myPrize} ETB Added to Wallet
+          {/* 🏆 WINNER ANNOUNCEMENT BANNER */}
+          <div style={{ 
+            background: iWon ? 'linear-gradient(135deg, #f1c40f, #f39c12)' : '#2c3547', 
+            padding: 20, 
+            borderRadius: 15, 
+            textAlign: 'center',
+            marginBottom: 30,
+            boxShadow: iWon ? '0 0 30px rgba(241, 196, 15, 0.5)' : 'none',
+            border: '2px solid #1a1f2b'
+          }}>
+            <p style={{ color: iWon ? '#1a1f2b' : '#a0aec0', margin: 0, fontSize: 14, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1 }}>
+              {iWon ? "🎉 YOU WON! 🎉" : "WINNER"}
             </p>
-          ) : (
-            <p style={{ color: '#e74c3c', textAlign: 'center', fontSize: 16, marginBottom: 30 }}>
-              Better luck next time!
+            <h1 style={{ color: iWon ? '#1a1f2b' : '#f1c40f', margin: '10px 0', fontSize: 32, fontWeight: 'bold' }}>
+              @{winnerName}
+            </h1>
+            <p style={{ color: iWon ? '#1a1f2b' : '#a0aec0', margin: 0, fontSize: 18, fontWeight: 'bold' }}>
+              Won {firstPrize} ETB
             </p>
-          )}
+          </div>
+
+          {/* MY RESULT */}
+          <div style={{ textAlign: 'center', marginBottom: 30 }}>
+            <h3 style={{ color: 'white', margin: 0 }}>Your Rank: #{myRank}</h3>
+            {myPrize > 0 ? (
+              <p style={{ color: '#2ecc71', fontSize: 20, fontWeight: 'bold', margin: '5px 0' }}>
+                +{myPrize} ETB Added to Wallet
+              </p>
+            ) : (
+              <p style={{ color: '#e74c3c', fontSize: 16, margin: '5px 0' }}>
+                Better luck next time!
+              </p>
+            )}
+          </div>
 
           {/* LEADERBOARD */}
           <div style={{ background: '#2c3547', borderRadius: 10, padding: 15, marginBottom: 30 }}>
             <h3 style={{ color: 'white', marginTop: 0, marginBottom: 15, borderBottom: '1px solid #4a5568', paddingBottom: 10 }}>
-              Leaderboard
+              Final Rankings
             </h3>
             {allScores.map((score, index) => {
               let rankIcon = `#${index + 1}`;
@@ -437,7 +441,6 @@ export default function FplDashboard() {
                 prizeText = `+${thirdPrize} ETB`;
               }
 
-              // Highlight the current user's row with a border
               const myBorder = isMe ? '2px solid #2ecc71' : 'none';
 
               return (
@@ -445,7 +448,7 @@ export default function FplDashboard() {
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center',
-                  padding: '12px 10px', 
+                  padding: '10px', 
                   borderBottom: index !== allScores.length - 1 ? '1px solid #3e4c61' : 'none',
                   background: rowBg,
                   borderRadius: 6,
