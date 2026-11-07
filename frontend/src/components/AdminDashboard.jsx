@@ -236,6 +236,7 @@ const handlebrodcstat=async ()=>{
   <h1>Admin Dashboard</h1>
   <button className="logout-btn" onClick={handleLogout}>Logout</button>
     <button className="logout-btn" onClick={handlebrodcstat}>brodcast</button>
+    <button className="logout-btn" onClick={() => navigate("/KenoAdmin")}>🎱 Keno report</button>
 </div>
       {/* Summary */}
       <section className="summary-grid">

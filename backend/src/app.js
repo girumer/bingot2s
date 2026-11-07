@@ -1867,6 +1867,11 @@ app.post("/gameid",async(req,res)=>{
   }
 
 })
+// ================= FAST KENO =================
+const { setupKeno } = require("./keno");
+const { verifyAdmin: verifyKenoAdmin } = require("../middleware/adminMiddleware");
+setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin: verifyKenoAdmin });
+
 const port = process.env.PORT || 3001;
 
 if (!process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === '0') {

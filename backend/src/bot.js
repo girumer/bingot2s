@@ -158,6 +158,9 @@ const mainMenu = {
       ],
       [
         { text: "⚽ Fantasy Premier League", callback_data: "fpl" },  // ← NEW ROW
+      ],
+      [
+        { text: "🎱 Fast Keno", callback_data: "keno" },
       ]
     ]
   }
@@ -1164,6 +1167,19 @@ case "referral":
             }
         });
         break;
+        case "keno": {
+    const kenoUrl = `${process.env.FRONTEND_URL}/FastKeno`;
+    bot.sendMessage(chatId, `🎱 <b>Fast Keno</b>\n\nPick 1–10 numbers from 1–80. A new draw every minute — match numbers to win up to the paytable prize!`, {
+        parse_mode: "HTML",
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "🎱 Play Fast Keno", web_app: { url: kenoUrl } }]
+            ]
+        }
+    });
+    answerQuery("", false);
+    break;
+  }
         case "fpl":
     const fplUrl = `${process.env.FRONTEND_URL}/FplDashboard`;
 

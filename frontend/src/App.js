@@ -26,6 +26,9 @@ import TopUsers from './components/TopUsers';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import AdminPasswordReset from './components/AdminPasswordReset';
 import SpinnerSelection from './components/SpinnerSelection';
+import FastKeno from './components/FastKeno';
+import KenoTV from './components/KenoTV';
+import KenoAdmin from './components/KenoAdmin';
 import ProtectedRoute from './components/ProtectedRoute';
 import axios from "axios";
 
@@ -60,6 +63,7 @@ function App() {
           {/* Admin protected route */}
           <Route element={<ProtectedAdminRoute />}>
             <Route path="/AdminDashboard" element={<AdminDashboard />} />
+            <Route path="/KenoAdmin" element={<KenoAdmin />} />
           </Route>
 
           {/* ⭐ GAME ROUTES – moved outside ProtectedRoute (use initData, not token) */}
@@ -67,7 +71,9 @@ function App() {
           <Route path="/SpinnerSelection" element={<SpinnerSelection />} />
           <Route path="/BingoBoard" element={<BingoBoard />} />
           <Route path="/TopUsers" element={<TopUsers />} />
-          <Route path="/FplDashboard" element={<FplDashboard />} /> 
+          <Route path="/FplDashboard" element={<FplDashboard />} />
+          <Route path="/FastKeno" element={<FastKeno />} />
+          <Route path="/KenoTV" element={<KenoTV />} />
 
           {/* Protected user routes (require token) */}
           <Route element={<ProtectedRoute />}>
