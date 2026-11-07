@@ -9,14 +9,25 @@
   --gold: #f5c542;
   --green: #3ecf8e;
 
-  min-height: 100vh;
+  /* The page scrolls inside this box. Another stylesheet in the app
+     (BingoBoard.css) locks scrolling on <body>, so we can't rely on it. */
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  padding: 12px 12px 32px;
+  box-sizing: border-box;
+  z-index: 1;
+}
+.keno-inner {
   max-width: 560px;
   margin: 0 auto;
-  box-sizing: border-box;
+  padding: 12px 12px 40px;
 }
 .keno * { box-sizing: border-box; }
 
@@ -230,3 +241,42 @@
 .keno-history-row { align-items: baseline; }
 .keno-history-nums { flex: 1; }
 .keno-history-tags { color: var(--muted); white-space: nowrap; }
+
+/* ---- single stake box with + / − ---- */
+.keno-stake-box {
+  display: grid;
+  grid-template-columns: 56px 1fr 56px;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #14121b;
+}
+.keno-step {
+  border: none;
+  background: #221d2e;
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.keno-step:active { background: var(--accent); }
+.keno-step:disabled { opacity: 0.35; cursor: default; }
+.keno-stake-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  padding: 10px 0;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.keno-stake-input:focus { outline: none; }
+.keno-stake-input::-webkit-outer-spin-button,
+.keno-stake-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.keno-stake-hint { font-size: 12px; color: var(--muted); text-align: center; margin: 6px 0 10px; }

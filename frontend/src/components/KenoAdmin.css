@@ -8,7 +8,10 @@
   --pos: #3ecf8e;
   --neg: #ff6b6b;
 
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

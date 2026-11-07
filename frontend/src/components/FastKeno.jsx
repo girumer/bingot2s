@@ -5,7 +5,6 @@ import socket from "../socket";
 import "./FastKeno.css";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const STAKE_OPTIONS = [5, 10, 20, 50, 100];
 const REVEAL_STEP_MS = 180; // speed of the draw animation
 
 const MODES = [
@@ -65,7 +64,7 @@ const FastKeno = () => {
   const [mode, setMode] = useState("numbers");
   const [sideChoice, setSideChoice] = useState({ ht: "heads", oe: "odd" });
   const [picks, setPicks] = useState([]);
-  const [stake, setStake] = useState(10);
+  const [stake, setStake] = useState(7);
   const [draws, setDraws] = useState(1);
   const [wallet, setWallet] = useState(null);
   const [tickets, setTickets] = useState([]);
@@ -106,6 +105,7 @@ const FastKeno = () => {
   useEffect(() => {
     tg?.ready();
     tg?.expand();
+    tg?.disableVerticalSwipes?.(); // stop Telegram closing the app when scrolling
     loadState();
     loadMine();
   }, [loadState, loadMine, tg]);
@@ -167,6 +167,9 @@ const FastKeno = () => {
 
   // ---------- derived ----------
   const maxPicks = config?.MAX_PICKS ?? 10;
+  const minStake = config?.MIN_STAKE ?? 7;
+  const maxStake = config?.MAX_STAKE ?? 100;
+  const clampStake = (v) => Math.min(maxStake, Math.max(minStake, Math.round(Number(v) || minStake)));
   const drawOptions = config?.MULTI_DRAW_OPTIONS ?? [1, 5, 10];
   const secondsToDraw = Math.max(0, Math.ceil((nextDraw.at - serverNow) / 1000));
   const bettingOpen = serverNow < nextDraw.closeAt;
@@ -176,7 +179,8 @@ const FastKeno = () => {
   const progress = Math.min(100, Math.max(0, 100 - (secondsToDraw / intervalSec) * 100));
   const lastSummary = lastDraw && revealDone ? summarize(lastDraw.numbers) : null;
   const betType = mode === "numbers" ? "numbers" : sideChoice[mode];
-  const totalCost = stake * draws;
+  const safeStake = clampStake(stake);
+  const totalCost = safeStake * draws;
 
   const rows = useMemo(() => {
     const row = paytable[picks.length] || {};
@@ -218,7 +222,7 @@ const FastKeno = () => {
         initData,
         betType,
         picks: betType === "numbers" ? picks : [],
-        stake,
+        stake: safeStake,
         draws,
       });
       setWallet(data.wallet);
@@ -237,6 +241,7 @@ const FastKeno = () => {
   // ---------- render ----------
   return (
     <div className="keno">
+      <div className="keno-inner">
       <header className="keno-top">
         <div className="keno-title">🎱 Fast Keno</div>
         <div className="keno-wallet">💰 {wallet === null ? "—" : wallet.toFixed(2)}</div>
@@ -329,14 +334,36 @@ const FastKeno = () => {
           </div>
         )}
 
-        <div className="keno-field-label">Stake per draw</div>
-        <div className="keno-stakes">
-          {STAKE_OPTIONS.map((s) => (
-            <button key={s} className={`keno-chip ${stake === s ? "active" : ""}`} onClick={() => setStake(s)}>
-              {s}
-            </button>
-          ))}
+        <div className="keno-field-label">Stake per draw (birr)</div>
+        <div className="keno-stake-box">
+          <button
+            className="keno-step"
+            onClick={() => setStake((v) => clampStake(v - 1))}
+            disabled={stake <= minStake}
+            aria-label="Decrease stake"
+          >
+            −
+          </button>
+          <input
+            className="keno-stake-input"
+            type="number"
+            inputMode="numeric"
+            min={minStake}
+            max={maxStake}
+            value={stake}
+            onChange={(e) => setStake(e.target.value === "" ? "" : Number(e.target.value))}
+            onBlur={() => setStake((v) => clampStake(v))}
+          />
+          <button
+            className="keno-step"
+            onClick={() => setStake((v) => clampStake(v + 1))}
+            disabled={stake >= maxStake}
+            aria-label="Increase stake"
+          >
+            +
+          </button>
         </div>
+        <div className="keno-stake-hint">Min {minStake} · Max {maxStake}</div>
 
         <div className="keno-field-label">Play for</div>
         <div className="keno-draws">
@@ -375,7 +402,7 @@ const FastKeno = () => {
                   <tr key={r.matches}>
                     <td>{r.matches}</td>
                     <td>×{r.mult}</td>
-                    <td>{Math.min(stake * r.mult, config?.MAX_WIN_PER_TICKET ?? Infinity).toLocaleString()}</td>
+                    <td>{Math.min(safeStake * r.mult, config?.MAX_WIN_PER_TICKET ?? Infinity).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -437,6 +464,7 @@ const FastKeno = () => {
           })}
         </section>
       )}
+      </div>
     </div>
   );
 };
