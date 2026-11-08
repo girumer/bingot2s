@@ -5,7 +5,7 @@ import socket from "../socket";
 import "./FastKeno.css";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const REVEAL_STEP_MS = 180; // speed of the draw animation
+const REVEAL_STEP_MS = 1000; // one number per second during the draw
 
 const TABS = [
   { id: "play", label: "🎱 Play" },
@@ -83,7 +83,7 @@ const FastKeno = () => {
   const [mode, setMode] = useState("numbers");
   const [sideChoice, setSideChoice] = useState({ ht: "heads", oe: "odd" });
   const [picks, setPicks] = useState([]);
-  const [stake, setStake] = useState(7);
+  const [stake, setStake] = useState(2);
   const [draws, setDraws] = useState(1);
   const [wallet, setWallet] = useState(null);
   const [tickets, setTickets] = useState([]);
@@ -186,9 +186,9 @@ const FastKeno = () => {
         closeAt: d.nextDrawAt - (config?.BET_CLOSE_MS ?? 5000),
       });
       setLastDraw({ drawId: d.drawId, numbers: d.numbers });
-      setResults((r) =>
-        [{ drawId: d.drawId, drawAt: d.drawId * 60000, numbers: d.numbers, ...summarize(d.numbers) }, ...r.filter((x) => x.drawId !== d.drawId)].slice(0, 30)
-      );
+
+      // Clear the board so the same numbers aren't bet again by accident.
+      setPicks([]);
 
       clearInterval(revealTimer.current);
       setRevealed([]);
@@ -200,6 +200,10 @@ const FastKeno = () => {
         if (i >= d.numbers.length) {
           clearInterval(revealTimer.current);
           setRevealDone(true);
+          // Only now show the result in the Results tab and update wallet/tickets.
+          setResults((r) =>
+            [{ drawId: d.drawId, drawAt: d.drawId * 60000, numbers: d.numbers, ...summarize(d.numbers) }, ...r.filter((x) => x.drawId !== d.drawId)].slice(0, 30)
+          );
           loadMine();
         }
       }, REVEAL_STEP_MS);
@@ -262,6 +266,14 @@ const FastKeno = () => {
   const safeStake = clampStake(stake);
   const totalCost = safeStake * draws;
   const myOpenTickets = tickets.filter((t) => t.status === "pending");
+  // My numbers in the draw being shown, so hits light up even after the board is cleared.
+  const myDrawPicks = useMemo(() => {
+    const set = new Set();
+    if (lastDraw) tickets.filter((t) => t.drawId === lastDraw.drawId).forEach((t) => (t.picks || []).forEach((n) => set.add(n)));
+    return set;
+  }, [tickets, lastDraw]);
+  const calling = !revealDone && revealed.length > 0;
+  const latestCalled = revealed[revealed.length - 1];
 
   const rows = useMemo(() => {
     const row = paytable[picks.length] || {};
@@ -338,7 +350,7 @@ const FastKeno = () => {
     <div className="keno">
       <div className="keno-inner">
         {/* header */}
-        <header className="kn-head">
+        <div className="kn-head">
           <div>
             <div className="kn-title">Fast Keno</div>
             <div className="kn-sub">
@@ -349,7 +361,7 @@ const FastKeno = () => {
             </div>
           </div>
           <div className="kn-wallet">{wallet === null ? "—" : wallet.toFixed(2)} ETB</div>
-        </header>
+        </div>
         <div className="kn-bar"><div className="kn-bar-fill" style={{ width: `${progress}%` }} /></div>
 
         {/* stats strip (like the GK / DEF / MID strip) */}
@@ -374,7 +386,7 @@ const FastKeno = () => {
           <>
             <section className="kn-card">
               <div className="kn-card-head">
-                <span>Last draw {lastDraw ? `#${lastDraw.drawId}` : ""}</span>
+                <span>{calling ? "Drawing" : "Last draw"} {lastDraw ? `#${lastDraw.drawId}` : ""}</span>
                 {lastSummary && (
                   <span className="kn-tags">
                     <span className="kn-tag">{OUTCOME_LABEL[lastSummary.headsTails]} {lastSummary.headsCount}–{20 - lastSummary.headsCount}</span>
@@ -382,10 +394,21 @@ const FastKeno = () => {
                   </span>
                 )}
               </div>
+              {calling && (
+                <div className="kn-calling">
+                  <span key={latestCalled} className={`kn-calling-ball ${latestCalled > 40 ? "tail" : ""} ${myDrawPicks.has(latestCalled) ? "hit" : ""}`}>
+                    {latestCalled}
+                  </span>
+                  <div>
+                    <div className="kn-calling-label">Now calling</div>
+                    <div className="kn-calling-count">{revealed.length} / 20</div>
+                  </div>
+                </div>
+              )}
               <div className="kn-balls">
                 {revealed.length === 0 && <span className="kn-muted">Waiting for the next draw…</span>}
                 {revealed.map((n) => (
-                  <span key={n} className={`kn-ball ${n > 40 ? "tail" : ""} ${pickSet.has(n) ? "hit" : ""}`}>{n}</span>
+                  <span key={n} className={`kn-ball ${n > 40 ? "tail" : ""} ${myDrawPicks.has(n) ? "hit" : ""}`}>{n}</span>
                 ))}
               </div>
             </section>

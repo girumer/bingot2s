@@ -56,7 +56,7 @@ export default function KenoAdmin() {
 
   return (
     <div className="ka">
-      <header className="ka-head">
+      <div className="ka-head">
         <div>
           <h1>Fast Keno report</h1>
           <p className="ka-muted">Updates every minute. Days follow Addis Ababa time.</p>
@@ -71,7 +71,7 @@ export default function KenoAdmin() {
           <button onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
           <button onClick={() => navigate("/AdminDashboard")}>Back</button>
         </div>
-      </header>
+      </div>
 
       {error && <div className="ka-error">{error}</div>}
 

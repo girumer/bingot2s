@@ -30,7 +30,7 @@ const KENO_CONFIG = {
   DRAWN_NUMBERS: 20,
   MIN_PICKS: 1,
   MAX_PICKS: 10,
-  MIN_STAKE: 7,
+  MIN_STAKE: 2,
   MAX_STAKE: 100,
   MAX_WIN_PER_TICKET: 10000,     // cap on one ticket's payout (birr)
   MAX_TICKETS_PER_DRAW: 10,      // per player, per draw

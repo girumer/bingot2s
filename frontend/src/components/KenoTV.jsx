@@ -8,7 +8,7 @@ import "./KenoTV.css";
 // Open /KenoTV in a browser and press F11 for full screen.
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const REVEAL_STEP_MS = 400;
+const REVEAL_STEP_MS = 1000; // one number per second
 
 const LABEL = { heads: "HEADS", tails: "TAILS", ht_evens: "EVENS", odd: "ODD", even: "EVEN", oe_evens: "EVENS" };
 function summarize(numbers) {
