@@ -59,10 +59,14 @@ function summarize(numbers) {
 }
 const timeOf = (ms) =>
   new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Addis_Ababa" });
-const maskName = (name) => {
-  const chars = Array.from(String(name || "player").trim());
-  if (chars.length <= 2) return `${chars[0] || "?"}***`;
-  return `${chars[0]}***${chars[chars.length - 1]}`;
+// Same rule as the server: real username, phone numbers partly hidden.
+const displayName = (username) => {
+  const name = String(username || "Player").trim();
+  const digits = name.replace(/\D/g, "");
+  if (digits.length >= 7 && digits.length >= name.replace(/[\s+\-()]/g, "").length - 1) {
+    return `${name.slice(0, 4)}****${name.slice(-2)}`;
+  }
+  return name.length > 20 ? `${name.slice(0, 19)}…` : name;
 };
 const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -273,7 +277,7 @@ const FastKeno = () => {
   const drawDone = phase === "checking";
 
   const lastResult = results[0];
-  const lastSummary = lastResult ? summarize(lastResult.numbers) : null;
+  const lastSet = useMemo(() => new Set(lastResult?.numbers || []), [lastResult]);
 
   const progress =
     phase === "betting" ? Math.min(100, Math.max(0, 100 - ((round.drawAt - serverNow) / joinMs) * 100))
@@ -388,7 +392,7 @@ const FastKeno = () => {
 
   // Ticket list with All / My Tickets / My Bets filters.
   const myIds = new Set(tickets.map((t) => String(t._id)));
-  const asCard = (t) => ({ id: String(t._id), name: maskName(myName), betType: t.betType || "numbers", picks: t.picks || [], stake: t.stake, drawId: t.drawId });
+  const asCard = (t) => ({ id: String(t._id), name: displayName(t.username || myName), betType: t.betType || "numbers", picks: t.picks || [], stake: t.stake, drawId: t.drawId });
   const myGameTickets = tickets.filter((t) => t.drawId === listDrawId).map(asCard);
   const myBets = tickets.filter((t) => t.drawId >= (listDrawId || 0)).map(asCard);
   const TicketBoard = ({ drawn, done }) => {
@@ -481,23 +485,6 @@ const FastKeno = () => {
                   </div>
                 )}
 
-                {lastResult && (
-                  <section className="kn-card">
-                    <div className="kn-card-head">
-                      <span>Last game #{lastResult.drawId}</span>
-                      <span className="kn-tags">
-                        <span className="kn-tag">{OUTCOME_LABEL[lastSummary.headsTails]} {lastSummary.headsCount}–{20 - lastSummary.headsCount}</span>
-                        <span className="kn-tag">{OUTCOME_LABEL[lastSummary.oddEven]} {lastSummary.oddCount}–{20 - lastSummary.oddCount}</span>
-                      </span>
-                    </div>
-                    <div className="kn-balls">
-                      {lastResult.numbers.map((n) => (
-                        <span key={n} className={`kn-ball ${n > 40 ? "tail" : ""}`}>{n}</span>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
                 <div className="kn-pills">
                   {MODES.map((m) => (
                     <button key={m.id} className={`kn-pill ${mode === m.id ? "active" : ""}`} onClick={() => setMode(m.id)}>
@@ -509,7 +496,11 @@ const FastKeno = () => {
                 {mode === "numbers" ? (
                   <section className="kn-grid">
                     {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => (
-                      <button key={n} className={`kn-cell ${pickSet.has(n) ? "picked" : ""}`} onClick={() => togglePick(n)}>
+                      <button
+                        key={n}
+                        className={`kn-cell ${pickSet.has(n) ? "picked" : ""} ${lastSet.has(n) ? "last" : ""}`}
+                        onClick={() => togglePick(n)}
+                      >
                         {n}
                       </button>
                     ))}

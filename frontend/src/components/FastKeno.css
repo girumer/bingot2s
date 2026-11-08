@@ -655,3 +655,17 @@
 .kt-status.playing { color: var(--blue); }
 .kt-status.won { color: var(--green); }
 .kt-status.lost { color: #8b93a7; }
+
+/* last game's numbers: small red asterisk in the top-right corner of the board cell */
+.kn-cell { position: relative; }
+.kn-cell.last::after {
+  content: "*";
+  position: absolute;
+  top: 0;
+  right: 3px;
+  color: #ff3b3b;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+}
+.kn-cell.picked.last::after { color: #ffe0e0; }
