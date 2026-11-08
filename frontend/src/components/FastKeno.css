@@ -433,3 +433,59 @@
 .kn-ticket-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .kn-side-live { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .kn-calling-mine { margin-left: auto; text-align: right; }
+
+/* ================= round phases ================= */
+.kn-status.waiting { color: var(--muted); font-weight: 700; }
+.kn-status.betting { color: var(--green); font-weight: 800; }
+.kn-status.drawing { color: var(--gold); font-weight: 800; }
+.kn-status.checking { color: var(--gold); font-weight: 800; }
+.kn-bar-fill.drawing, .kn-bar-fill.checking { background: var(--gold); }
+.kn-blue { color: var(--blue); }
+.kn-purple { color: var(--purple); }
+
+.kn-waiting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  background: var(--green-bg);
+  border: 1.5px dashed var(--green);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.kn-waiting strong { color: var(--green); font-size: 17px; }
+.kn-waiting span { color: var(--text); font-size: 13px; opacity: 0.85; }
+
+/* ================= focus view: called numbers ================= */
+.kn-called { padding: 10px; }
+.kn-called-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.kn-slot {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: clamp(16px, 5.4vw, 24px);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  transition: transform 0.2s;
+}
+.kn-slot.empty { background: transparent; border: 2px dashed var(--panel-2); }
+.kn-slot.head { background: var(--blue); animation: kn-slot-in 0.45s ease-out; }
+.kn-slot.tail { background: var(--purple); animation: kn-slot-in 0.45s ease-out; }
+.kn-slot.mine { background: var(--gold); color: #1b1600; }
+.kn-slot.latest { box-shadow: 0 0 0 3px #fff, 0 0 18px rgba(255, 255, 255, 0.5); transform: scale(1.08); }
+@keyframes kn-slot-in {
+  0% { transform: scale(0.2) rotate(-120deg); opacity: 0; }
+  70% { transform: scale(1.15) rotate(0); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* my tickets during the draw: big and clear */
+.kn-focus-mine { margin-bottom: 12px; }
+.kn-focus-mine .kn-ticket { border-width: 2px; }
+.kn-focus-mine .kn-chip { min-width: 40px; padding: 8px 6px; font-size: 17px; }
+.kn-ticket.won { border-color: var(--green); background: #17291f; box-shadow: 0 0 16px rgba(46, 204, 113, 0.35); }
+.kn-win { color: var(--green); font-weight: 900; font-size: 18px; }
+.kn-ticket-game { margin: 4px 0; }

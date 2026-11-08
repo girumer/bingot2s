@@ -156,11 +156,13 @@ export default function KenoAdmin() {
           <section className="ka-card">
             <h2>Current settings</h2>
             <div className="ka-settings">
-              <div>Draw every <strong>{data.config.DRAW_INTERVAL_MS / 1000}s</strong></div>
-              <div>Betting closes <strong>{data.config.BET_CLOSE_MS / 1000}s</strong> before draw</div>
+              <div>Game starts only when someone places a ticket</div>
+              <div>Join countdown <strong>{data.config.JOIN_WINDOW_MS / 1000}s</strong></div>
+              <div>Numbers called every <strong>{data.config.CALL_INTERVAL_MS / 1000}s</strong></div>
+              <div>Check time after draw <strong>{data.config.CHECK_WINDOW_MS / 1000}s</strong></div>
               <div>Stake <strong>{data.config.MIN_STAKE}–{data.config.MAX_STAKE}</strong> birr</div>
               <div>Max win per ticket <strong>{fmt(data.config.MAX_WIN_PER_TICKET)}</strong></div>
-              <div>Max tickets per draw <strong>{data.config.MAX_TICKETS_PER_DRAW}</strong></div>
+              <div>Max tickets per game <strong>{data.config.MAX_TICKETS_PER_DRAW}</strong></div>
               <div>Multi-draw <strong>{data.config.MULTI_DRAW_OPTIONS.join(", ")}</strong></div>
               {Object.entries(data.sideBets).map(([k, v]) => (
                 <div key={k}>{v.label} <strong>×{v.multiplier}</strong></div>

@@ -24,8 +24,12 @@ const mongoose = require("mongoose");
 
 // ---------------- SETTINGS (change these, not the code below) ----------------
 const KENO_CONFIG = {
-  DRAW_INTERVAL_MS: 60 * 1000, // a new draw every 60 seconds
-  BET_CLOSE_MS: 5 * 1000,      // betting closes 5 seconds before each draw
+  // Game flow: waiting (no tickets, nothing runs) → betting countdown starts with
+  // the first ticket → 20 numbers called one per second → short check pause → next game.
+  JOIN_WINDOW_MS: 15 * 1000,   // countdown after the first ticket so others can join
+  BET_CLOSE_MS: 1 * 1000,      // tickets in the last second go to the next game
+  CALL_INTERVAL_MS: 1000,      // one number called per second
+  CHECK_WINDOW_MS: 5 * 1000,   // after the 20th number, time to check tickets
   TOTAL_NUMBERS: 80,
   DRAWN_NUMBERS: 20,
   MIN_PICKS: 1,
@@ -121,16 +125,6 @@ const WalletLedger = model("WalletLedger", WalletLedgerSchema);
 const KenoDrawReport = model("KenoDrawReport", KenoDrawReportSchema);
 
 // ---------------- HELPERS ----------------
-// Draw times are fixed to the clock, so every server process agrees on
-// which draw is open without sharing memory.
-const drawIdAt = (time) => Math.floor(time / KENO_CONFIG.DRAW_INTERVAL_MS) + 1;
-const drawTimeOf = (drawId) => drawId * KENO_CONFIG.DRAW_INTERVAL_MS;
-function openDrawId(now = Date.now()) {
-  let id = drawIdAt(now);
-  if (drawTimeOf(id) - now < KENO_CONFIG.BET_CLOSE_MS) id += 1;
-  return id;
-}
-
 // Cryptographically secure draw: shuffle 1–80, take the first 20.
 function generateDrawNumbers() {
   const pool = Array.from({ length: KENO_CONFIG.TOTAL_NUMBERS }, (_, i) => i + 1);
@@ -249,6 +243,51 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     }
   }
 
+  // ---------------- GAME ROUND STATE ----------------
+  // Only the main process (core 0) serves players, so the round lives in memory.
+  // phase: "waiting" | "betting" | "drawing" | "checking"
+  const round = { drawId: 1, phase: "waiting", drawAt: null, numbers: null, startedAt: null, endsAt: null };
+  const callMs = () => KENO_CONFIG.DRAWN_NUMBERS * KENO_CONFIG.CALL_INTERVAL_MS;
+
+  // The game a ticket placed right now goes into.
+  function bettingDrawId(now = Date.now()) {
+    if (round.phase === "waiting") return round.drawId;
+    if (round.phase === "betting" && round.drawAt - now > KENO_CONFIG.BET_CLOSE_MS) return round.drawId;
+    return round.drawId + 1; // closing, drawing or checking → next game
+  }
+
+  function publicRound() {
+    return {
+      drawId: round.drawId,
+      phase: round.phase,
+      drawAt: round.drawAt,
+      endsAt: round.endsAt,
+      serverNow: Date.now(),
+      // While drawing/checking: the numbers and when calling started, so a
+      // player who opens the page mid-draw sees the right numbers so far.
+      draw:
+        round.phase === "drawing" || round.phase === "checking"
+          ? { drawId: round.drawId, numbers: round.numbers, startedAt: round.startedAt, stepMs: KENO_CONFIG.CALL_INTERVAL_MS }
+          : null,
+    };
+  }
+  const emitRound = () => io.emit("keno:round", publicRound());
+
+  function startBetting(drawId) {
+    round.drawId = drawId;
+    round.phase = "betting";
+    round.drawAt = Date.now() + KENO_CONFIG.JOIN_WINDOW_MS;
+    round.numbers = round.startedAt = round.endsAt = null;
+    emitRound();
+    console.log(`[KENO] Game #${drawId}: countdown started`);
+  }
+  function goWaiting(drawId) {
+    round.drawId = drawId;
+    round.phase = "waiting";
+    round.drawAt = round.numbers = round.startedAt = round.endsAt = null;
+    emitRound();
+  }
+
   // Public view of a ticket for the live players list (no Telegram ids).
   const publicTicket = (t) => ({
     id: String(t._id),
@@ -275,7 +314,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
   // ---- Players and tickets in one draw (for the live list) ----
   app.get("/api/keno/players", async (req, res) => {
     try {
-      const drawId = Number(req.query.drawId) || openDrawId();
+      const drawId = Number(req.query.drawId) || round.drawId;
       const tickets = await KenoTicket.find({ drawId }).sort({ createdAt: -1 }).limit(200).lean();
       const players = new Set(tickets.map((t) => t.telegramId)).size;
       res.json({
@@ -306,20 +345,16 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     }
   });
 
-  // ---- Public state: next draw, recent results, paytables ----
+  // ---- Public state: current round, recent results, paytables ----
   app.get("/api/keno/state", async (req, res) => {
     try {
-      const now = Date.now();
-      const nextDrawId = openDrawId(now);
       const recent = await KenoDraw.find({}, { _id: 0, drawId: 1, drawAt: 1, numbers: 1, headsCount: 1, oddCount: 1 })
         .sort({ drawId: -1 })
         .limit(10)
         .lean();
       res.json({
-        serverNow: now,
-        nextDrawId,
-        nextDrawAt: drawTimeOf(nextDrawId),
-        betCloseAt: drawTimeOf(nextDrawId) - KENO_CONFIG.BET_CLOSE_MS,
+        serverNow: Date.now(),
+        round: publicRound(),
         recentDraws: recent.map((d) => ({ ...d, ...drawSummary(d.numbers) })),
         config: KENO_CONFIG,
         paytable: PAYTABLE,
@@ -370,7 +405,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     const { error, bet } = parseBet(req.body);
     if (error) return res.status(400).json({ error });
 
-    const firstDrawId = openDrawId();
+    const firstDrawId = bettingDrawId();
     const drawIds = Array.from({ length: bet.draws }, (_, i) => firstDrawId + i);
     const total = bet.stake * bet.draws;
 
@@ -429,8 +464,10 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
       res.json({
         tickets,
         wallet: round2(player.Wallet),
-        firstDrawAt: drawTimeOf(firstDrawId),
       });
+
+      // First ticket for a waiting game starts its countdown.
+      if (round.phase === "waiting" && firstDrawId === round.drawId) startBetting(round.drawId);
 
       // Tell everyone on the keno page about the new ticket(s).
       io.emit("keno:bet", { tickets: tickets.map(publicTicket) });
@@ -518,7 +555,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     const numbers = generateDrawNumbers();
     const { headsCount, oddCount } = drawSummary(numbers);
     try {
-      await KenoDraw.create({ drawId, drawAt: new Date(drawTimeOf(drawId)), numbers, headsCount, oddCount });
+      await KenoDraw.create({ drawId, drawAt: new Date(), numbers, headsCount, oddCount });
     } catch (err) {
       if (err.code !== 11000) throw err; // 11000 = already drawn, use the saved one
     }
@@ -565,7 +602,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
       await KenoDrawReport.updateOne(
         { drawId: draw.drawId },
         {
-          $setOnInsert: { drawAt: new Date(drawTimeOf(draw.drawId)) },
+          $setOnInsert: { drawAt: draw.drawAt ? new Date(draw.drawAt) : new Date() },
           $inc: { tickets: sum.tickets, staked: sum.staked, paid: round2(sum.paid), winners: sum.winners, ...inc },
         },
         { upsert: true }
@@ -574,49 +611,77 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     }
   }
 
+  // ---------------- GAME LOOP (main process only) ----------------
   let running = false;
-  let lastSettledDrawId = 0;
+  let ready = false;
+  let lastIdleCheck = 0;
+
+  async function nextGame() {
+    const nextId = round.drawId + 1;
+    const hasTickets = await KenoTicket.exists({ drawId: nextId, status: "pending" });
+    if (hasTickets) startBetting(nextId);
+    else goWaiting(nextId);
+  }
 
   async function tick() {
-    if (running) return;
+    if (running || !ready) return;
     running = true;
     try {
-      const dueDrawId = drawIdAt(Date.now()) - 1; // newest draw whose time has passed
-      if (dueDrawId > lastSettledDrawId) {
-        // Settle anything missed (server restart, late tickets).
-        const pendingIds = await KenoTicket.distinct("drawId", { status: "pending", drawId: { $lt: dueDrawId } });
-        for (const id of pendingIds.sort((a, b) => a - b)) {
-          await settleDraw(await getOrCreateDraw(id));
-        }
+      const now = Date.now();
 
-        const draw = await getOrCreateDraw(dueDrawId);
+      if (round.phase === "betting" && now >= round.drawAt) {
+        // Countdown over: draw 20 numbers, settle tickets, start calling.
+        const draw = await getOrCreateDraw(round.drawId);
         await settleDraw(draw);
-        lastSettledDrawId = dueDrawId;
-
-        const nextDrawId = openDrawId(Date.now());
-        io.emit("keno:draw", {
-          drawId: draw.drawId,
-          numbers: draw.numbers,
-          ...drawSummary(draw.numbers),
-          nextDrawId,
-          nextDrawAt: drawTimeOf(nextDrawId),
-          serverNow: Date.now(),
-        });
+        round.phase = "drawing";
+        round.numbers = draw.numbers;
+        round.startedAt = Date.now();
+        round.endsAt = round.startedAt + callMs();
+        emitRound();
+      } else if (round.phase === "drawing" && now >= round.endsAt) {
+        round.phase = "checking";
+        round.endsAt = now + KENO_CONFIG.CHECK_WINDOW_MS;
+        emitRound();
+      } else if (round.phase === "checking" && now >= round.endsAt) {
+        await nextGame();
+      } else if (round.phase === "waiting" && now - lastIdleCheck > 15000) {
+        // Safety net only (tickets normally start the countdown directly).
+        lastIdleCheck = now;
+        if (await KenoTicket.exists({ drawId: round.drawId, status: "pending" })) startBetting(round.drawId);
       }
     } catch (err) {
-      console.error("[KENO] draw error:", err);
+      console.error("[KENO] loop error:", err);
     } finally {
       running = false;
     }
   }
 
+  // On startup: settle anything left over, then resume where we were.
+  async function init() {
+    const last = await KenoDraw.findOne({}).sort({ drawId: -1 }).lean();
+    const lastId = last ? last.drawId : 0;
+
+    const stale = await KenoTicket.distinct("drawId", { status: "pending", drawId: { $lte: lastId } });
+    for (const id of stale.sort((a, b) => a - b)) {
+      await settleDraw(await getOrCreateDraw(id));
+    }
+
+    const firstPending = await KenoTicket.findOne({ status: "pending", drawId: { $gt: lastId } })
+      .sort({ drawId: 1 })
+      .lean();
+    if (firstPending) startBetting(firstPending.drawId);
+    else goWaiting(lastId + 1);
+    ready = true;
+  }
+
   const isLeader = !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === "0";
   if (isLeader) {
-    lastSettledDrawId = drawIdAt(Date.now()) - 2;
-    setInterval(tick, 1000);
+    init()
+      .then(() => console.log(`[KENO] Ready. Game #${round.drawId} is ${round.phase}.`))
+      .catch((err) => console.error("[KENO] init error:", err));
+    setInterval(tick, 250);
     // Online count for everyone with the keno page open, every 5 seconds.
     setInterval(() => io.to("keno").emit("keno:online", { online: onlineCount() }), 5000);
-    console.log("[KENO] Draw loop started.");
   }
 }
 
