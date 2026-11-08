@@ -1,13 +1,19 @@
+/* Fast Keno — colours match the FPL page (navy + green) */
 .keno {
-  --bg: #0e0e11;
-  --panel: #1a1822;
-  --line: #2c2838;
-  --text: #f5f5f5;
-  --muted: #9a97a8;
-  --accent: #764ba2;
-  --blue: #4cafef;
-  --gold: #f5c542;
-  --green: #3ecf8e;
+  --bg: #1b202c;
+  --panel: #212838;
+  --panel-2: #2b3445;
+  --btn: #2d3347;
+  --line: #2a3142;
+  --text: #fbfdff;
+  --muted: #8b93a7;
+  --green: #2ecc71;
+  --green-bg: #1d4c3f;
+  --gold: #edc21a;
+  --orange: #e8a33d;
+  --blue: #3b8fd9;
+  --purple: #9b7be0;
+  --red: #ff6b6b;
 
   /* The page scrolls inside this box. Another stylesheet in the app
      (BingoBoard.css) locks scrolling on <body>, so we can't rely on it. */
@@ -20,241 +26,220 @@
   touch-action: pan-y;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   box-sizing: border-box;
   z-index: 1;
 }
-.keno-inner {
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 12px 12px 40px;
-}
 .keno * { box-sizing: border-box; }
+.keno button { font-family: inherit; }
+.keno-inner { max-width: 560px; margin: 0 auto; padding: 14px 14px 40px; }
 
-.keno-top {
+.kn-muted { color: var(--muted); font-size: 13px; }
+.kn-mt0 { margin-top: 0; }
+.kn-mt6 { margin-top: 6px; }
+.kn-pad { padding: 14px; margin: 0; }
+.kn-green { color: var(--green); font-weight: 700; }
+.kn-big { font-size: 18px; }
+
+/* ---------- header ---------- */
+.kn-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.kn-title { font-size: 24px; font-weight: 800; }
+.kn-sub { color: var(--muted); font-size: 14px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kn-open { color: var(--green); font-weight: 700; }
+.kn-closed { color: var(--gold); font-weight: 700; }
+.kn-wallet {
+  border: 1.5px solid var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 8px 14px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.kn-bar { height: 4px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin: 12px 0; }
+.kn-bar-fill { height: 100%; background: var(--green); transition: width 0.25s linear; }
+
+/* ---------- stats strip ---------- */
+.kn-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 10px 6px;
+  margin-bottom: 12px;
+}
+.kn-stats div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.kn-stats span { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 0.04em; }
+.kn-stats strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+
+/* ---------- main tabs ---------- */
+.kn-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.kn-tab {
+  background: var(--panel);
+  border: 1.5px solid transparent;
+  color: var(--muted);
+  border-radius: 12px;
+  padding: 12px 4px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.kn-tab.active { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+
+/* ---------- pills ---------- */
+.kn-pills, .kn-draws { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.kn-pill {
+  flex: 1;
+  background: var(--panel-2);
+  border: none;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.kn-pill.active { background: var(--green); color: #fff; }
+
+/* ---------- cards ---------- */
+.kn-card { background: var(--panel); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.kn-card-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-}
-.keno-title { font-size: 20px; font-weight: 700; }
-.keno-wallet {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.keno section {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px;
-  margin-bottom: 10px;
-}
-.keno-section-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
   color: var(--muted);
-  margin-bottom: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
 }
-.keno-muted { color: var(--muted); font-size: 13px; }
+.kn-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.kn-tag {
+  text-transform: none;
+  letter-spacing: 0;
+  background: var(--panel-2);
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.kn-tag.heads { color: var(--blue); }
+.kn-tag.tails { color: var(--purple); }
+.kn-tag.odd, .kn-tag.even { color: var(--green); }
+.kn-tag.ht_evens, .kn-tag.oe_evens { color: var(--gold); }
 
-/* timer */
-.keno-timer-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  margin-bottom: 8px;
-  font-variant-numeric: tabular-nums;
-}
-.keno-timer-row .open { color: var(--green); font-weight: 600; }
-.keno-timer-row .closed { color: var(--gold); font-weight: 600; }
-.keno-bar { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
-.keno-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--blue));
-  transition: width 0.25s linear;
-}
-
-/* last draw balls */
-.keno-balls { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; }
-.keno-ball {
-  width: 30px;
-  height: 30px;
+/* ---------- last draw balls ---------- */
+.kn-balls { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; }
+.kn-ball {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   background: var(--blue);
-  color: #06121b;
-  animation: keno-pop 0.25s ease-out;
+  color: #fff;
+  animation: kn-pop 0.25s ease-out;
 }
-.keno-ball.hit { background: var(--gold); }
-@keyframes keno-pop {
-  from { transform: scale(0.3); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
+.kn-ball.tail { background: var(--purple); }
+.kn-ball.hit { background: var(--gold); color: #1b1600; }
+@keyframes kn-pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-/* number grid */
-.keno-grid {
+/* ---------- number board ---------- */
+.kn-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  gap: 4px;
+  gap: 5px;
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 12px;
 }
-.keno-cell {
+.kn-cell {
   aspect-ratio: 1;
   border: 1px solid var(--line);
-  background: #14121b;
+  background: var(--bg);
   color: var(--text);
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
   padding: 0;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+  touch-action: manipulation;
 }
-.keno-cell.drawn { border-color: var(--blue); color: var(--blue); }
-.keno-cell.picked { background: var(--accent); border-color: var(--accent); color: #fff; }
-.keno-cell.hit { background: var(--gold); border-color: var(--gold); color: #1a1400; }
+.kn-cell:nth-child(n + 41) { background: #1e2433; }
+.kn-cell.drawn { border-color: var(--blue); color: var(--blue); }
+.kn-cell.picked { background: var(--green); border-color: var(--green); color: #fff; }
+.kn-cell.hit { background: var(--gold); border-color: var(--gold); color: #1b1600; }
 
-/* controls */
-.keno-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.keno-row-btns { display: flex; gap: 6px; }
-.keno-ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.keno-stakes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
-.keno-chip {
-  border: 1px solid var(--line);
-  background: #14121b;
-  color: var(--text);
-  border-radius: 8px;
-  padding: 8px 0;
-  font-weight: 600;
-  cursor: pointer;
-}
-.keno-chip.active { border-color: var(--blue); color: var(--blue); }
-.keno-bet {
-  width: 100%;
-  border: none;
-  border-radius: 10px;
-  padding: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(90deg, var(--accent), var(--blue));
-  cursor: pointer;
-}
-.keno-bet:disabled { opacity: 0.5; cursor: default; }
-
-/* paytable */
-.keno-paytable table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-.keno-paytable th, .keno-paytable td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); }
-.keno-paytable th { color: var(--muted); font-weight: 500; font-size: 12px; }
-.keno-fine { color: var(--muted); font-size: 12px; line-height: 1.4; margin: 8px 0 0; }
-
-/* tickets */
-.keno-ticket { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 6px; }
-.keno-ticket.won { border-color: var(--green); }
-.keno-ticket-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
-.keno-ticket.won .keno-ticket-head span:last-child { color: var(--green); font-weight: 700; }
-.keno-ticket-picks { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
-.keno-ticket-picks span {
-  background: #14121b;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
-}
-
-/* history */
-.keno-history-row { display: flex; gap: 8px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); }
-.keno-history-row span:last-child { word-break: break-word; }
-
-/* ---- v2: bet types, multi-draw, outcomes ---- */
-.keno-last-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.keno-outcomes { display: flex; gap: 6px; }
-.keno-tag {
-  text-transform: none;
-  letter-spacing: 0;
-  background: #14121b;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 2px 8px;
-  color: var(--text);
-  font-size: 12px;
-}
-.keno-ball.tail { background: #9b7be0; color: #120a22; }
-.keno-ball.hit { background: var(--gold); color: #1a1400; }
-
-.keno-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
-.keno-tab {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  color: var(--muted);
-  border-radius: 10px;
-  padding: 9px 4px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.keno-tab.active { color: var(--text); border-color: var(--accent); background: #261d36; }
-
-.keno-cell.split { grid-column-start: 1; }
-.keno-grid .keno-cell:nth-child(n + 41) { background: #17141f; }
-.keno-grid .keno-cell.picked { background: var(--accent); }
-.keno-grid .keno-cell.hit { background: var(--gold); }
-
-.keno-side-options { display: grid; grid-template-columns: 1fr 0.8fr 1fr; gap: 8px; margin-top: 8px; }
-.keno-side-btn {
+/* ---------- side bets ---------- */
+.kn-side { display: grid; grid-template-columns: 1fr 0.85fr 1fr; gap: 8px; }
+.kn-side-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  background: #14121b;
-  border: 1px solid var(--line);
+  background: var(--bg);
+  border: 1.5px solid var(--line);
   color: var(--text);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 16px 4px;
   font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
 }
-.keno-side-btn strong { color: var(--blue); font-size: 18px; }
-.keno-side-btn.evens strong { color: var(--gold); }
-.keno-side-btn.active { border-color: var(--accent); background: #261d36; }
+.kn-side-btn strong { color: var(--green); font-size: 18px; }
+.kn-side-btn.evens strong { color: var(--gold); }
+.kn-side-btn.active { border-color: var(--green); background: var(--green-bg); }
+.kn-selected-side { display: flex; align-items: center; gap: 8px; font-weight: 700; }
 
-.keno-field-label { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
-.keno-draws { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+/* ---------- my selection ---------- */
+.kn-row-btns { display: flex; gap: 6px; text-transform: none; letter-spacing: 0; }
+.kn-ghost {
+  background: var(--btn);
+  border: none;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kn-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.kn-chip {
+  min-width: 30px;
+  text-align: center;
+  background: var(--green-bg);
+  border: 1px solid #2c6b55;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kn-chip.hit { background: var(--gold); border-color: var(--gold); color: #1b1600; }
 
-.keno > .keno-fine { margin: 0 2px 10px; }
-.keno-history-row { align-items: baseline; }
-.keno-history-nums { flex: 1; }
-.keno-history-tags { color: var(--muted); white-space: nowrap; }
-
-/* ---- single stake box with + / − ---- */
-.keno-stake-box {
+.kn-label { font-size: 12px; color: var(--muted); font-weight: 600; margin: 14px 0 6px; }
+.kn-stake {
   display: grid;
-  grid-template-columns: 56px 1fr 56px;
-  align-items: stretch;
-  border: 1px solid var(--line);
+  grid-template-columns: 58px 1fr 58px;
+  background: var(--bg);
+  border: 1.5px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
-  background: #14121b;
 }
-.keno-step {
+.kn-step {
   border: none;
-  background: #221d2e;
+  background: var(--btn);
   color: var(--text);
   font-size: 26px;
   font-weight: 700;
@@ -262,9 +247,9 @@
   cursor: pointer;
   touch-action: manipulation;
 }
-.keno-step:active { background: var(--accent); }
-.keno-step:disabled { opacity: 0.35; cursor: default; }
-.keno-stake-input {
+.kn-step:active { background: var(--green); }
+.kn-step:disabled { opacity: 0.35; cursor: default; }
+.kn-stake-input {
   width: 100%;
   border: none;
   background: transparent;
@@ -276,7 +261,102 @@
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
 }
-.keno-stake-input:focus { outline: none; }
-.keno-stake-input::-webkit-outer-spin-button,
-.keno-stake-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.keno-stake-hint { font-size: 12px; color: var(--muted); text-align: center; margin: 6px 0 10px; }
+.kn-stake-input:focus { outline: none; }
+.kn-stake-input::-webkit-outer-spin-button,
+.kn-stake-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.kn-hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 6px; }
+.kn-draws { margin-bottom: 14px; }
+
+.kn-bet {
+  width: 100%;
+  border: 1.5px solid var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.kn-bet:not(:disabled):active { background: var(--green); color: #fff; }
+.kn-bet:disabled { opacity: 0.45; cursor: default; }
+
+.kn-paytable { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; font-variant-numeric: tabular-nums; }
+.kn-paytable th, .kn-paytable td { text-align: left; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.kn-paytable th { color: var(--muted); font-weight: 600; font-size: 12px; }
+
+/* ---------- lists (players / history / results) ---------- */
+.kn-list { background: var(--bg); border-top: 1px solid var(--line); margin: 0 -14px 12px; }
+.kn-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--panel);
+  font-weight: 800;
+  font-size: 15px;
+}
+.kn-live { display: flex; align-items: center; gap: 6px; color: var(--green); font-size: 12px; font-weight: 800; }
+.kn-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: kn-blink 1.4s infinite; }
+@keyframes kn-blink { 50% { opacity: 0.25; } }
+
+.kn-row {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #161b26;
+}
+.kn-row.me { background: #1d2a2a; }
+.kn-row.won { background: #1a2a24; }
+.kn-avatar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 18px;
+}
+.kn-avatar.small { font-size: 12px; color: var(--muted); }
+.kn-avatar .kn-badge { position: absolute; left: -4px; bottom: -4px; }
+.kn-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 5px;
+  padding: 2px 5px;
+  color: #fff;
+  line-height: 1.2;
+}
+.kn-badge.num { background: var(--green); }
+.kn-badge.heads { background: var(--blue); }
+.kn-badge.tails { background: var(--purple); }
+.kn-badge.odd, .kn-badge.even { background: var(--orange); }
+.kn-badge.evens { background: var(--gold); color: #1b1600; }
+.kn-row-main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.kn-row-name { font-weight: 800; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kn-row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-variant-numeric: tabular-nums; }
+.kn-star { color: var(--gold); font-weight: 700; font-size: 14px; }
+
+.kn-result { padding: 12px 14px; border-bottom: 1px solid #161b26; display: flex; flex-direction: column; gap: 8px; }
+.kn-result-head { display: flex; justify-content: space-between; align-items: baseline; }
+.kn-result-balls { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.kn-mini {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.kn-mini.tail { background: var(--purple); }
+
+.kn-fine { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 4px 2px 0; }

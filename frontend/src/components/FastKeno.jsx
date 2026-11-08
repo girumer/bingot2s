@@ -7,6 +7,11 @@ import "./FastKeno.css";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const REVEAL_STEP_MS = 180; // speed of the draw animation
 
+const TABS = [
+  { id: "play", label: "🎱 Play" },
+  { id: "history", label: "🕘 History" },
+  { id: "results", label: "🏆 Results" },
+];
 const MODES = [
   { id: "numbers", label: "Numbers" },
   { id: "ht", label: "Heads / Tails" },
@@ -24,6 +29,15 @@ const BET_LABEL = {
   odd: "Odd",
   even: "Even",
   oe_evens: "O/E Evens",
+};
+const BADGE = {
+  numbers: { text: "NUM", cls: "num" },
+  heads: { text: "H", cls: "heads" },
+  tails: { text: "T", cls: "tails" },
+  ht_evens: { text: "EV", cls: "evens" },
+  odd: { text: "ODD", cls: "odd" },
+  even: { text: "EVN", cls: "even" },
+  oe_evens: { text: "EV", cls: "evens" },
 };
 const OUTCOME_LABEL = {
   heads: "Heads",
@@ -45,10 +59,15 @@ function summarize(numbers) {
   };
 }
 
+const timeOf = (ms) =>
+  new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Addis_Ababa" });
+
 const FastKeno = () => {
   const tg = window.Telegram?.WebApp;
   const initData = tg?.initData;
+  const myName = tg?.initDataUnsafe?.user?.username || tg?.initDataUnsafe?.user?.first_name;
 
+  const [tab, setTab] = useState("play");
   const [config, setConfig] = useState(null);
   const [paytable, setPaytable] = useState({});
   const [sideBets, setSideBets] = useState({});
@@ -59,7 +78,7 @@ const FastKeno = () => {
   const [lastDraw, setLastDraw] = useState(null); // { drawId, numbers }
   const [revealed, setRevealed] = useState([]);
   const [revealDone, setRevealDone] = useState(true);
-  const [history, setHistory] = useState([]);
+  const [results, setResults] = useState([]);
 
   const [mode, setMode] = useState("numbers");
   const [sideChoice, setSideChoice] = useState({ ht: "heads", oe: "odd" });
@@ -70,7 +89,11 @@ const FastKeno = () => {
   const [tickets, setTickets] = useState([]);
   const [placing, setPlacing] = useState(false);
 
+  const [live, setLive] = useState({ drawId: null, players: 0, tickets: 0, list: [] });
+  const [online, setOnline] = useState(0);
+
   const revealTimer = useRef(null);
+  const liveDrawId = useRef(null);
 
   // ---------- data loading ----------
   const loadState = useCallback(async () => {
@@ -80,8 +103,8 @@ const FastKeno = () => {
       setConfig(data.config);
       setPaytable(data.paytable);
       setSideBets(data.sideBets || {});
+      setStake((s) => Math.max(s, data.config.MIN_STAKE));
       setNextDraw({ id: data.nextDrawId, at: data.nextDrawAt, closeAt: data.betCloseAt });
-      setHistory(data.recentDraws || []);
       if (data.recentDraws?.length) {
         setLastDraw((prev) => prev || data.recentDraws[0]);
         setRevealed((prev) => (prev.length ? prev : data.recentDraws[0].numbers));
@@ -102,13 +125,50 @@ const FastKeno = () => {
     }
   }, [initData]);
 
+  const loadResults = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${BACKEND_URL}/api/keno/results?limit=30`);
+      setResults(data.draws || []);
+    } catch {
+      /* keep current values */
+    }
+  }, []);
+
+  const loadPlayers = useCallback(async (drawId) => {
+    if (!drawId) return;
+    try {
+      const { data } = await axios.get(`${BACKEND_URL}/api/keno/players?drawId=${drawId}`);
+      if (liveDrawId.current !== drawId) return; // a newer draw started meanwhile
+      setLive({ drawId: data.drawId, players: data.players, tickets: data.tickets, list: data.list });
+      setOnline(data.online);
+    } catch {
+      /* keep current values */
+    }
+  }, []);
+
   useEffect(() => {
     tg?.ready();
     tg?.expand();
     tg?.disableVerticalSwipes?.(); // stop Telegram closing the app when scrolling
     loadState();
     loadMine();
-  }, [loadState, loadMine, tg]);
+    loadResults();
+    socket.emit("keno:join");
+    const rejoin = () => socket.emit("keno:join");
+    socket.on("connect", rejoin);
+    return () => {
+      socket.emit("keno:leave");
+      socket.off("connect", rejoin);
+    };
+  }, [loadState, loadMine, loadResults, tg]);
+
+  // Load the live players list whenever the open draw changes.
+  useEffect(() => {
+    if (!nextDraw.id) return;
+    liveDrawId.current = nextDraw.id;
+    setLive({ drawId: nextDraw.id, players: 0, tickets: 0, list: [] });
+    loadPlayers(nextDraw.id);
+  }, [nextDraw.id, loadPlayers]);
 
   // ---------- clock ----------
   useEffect(() => {
@@ -116,7 +176,7 @@ const FastKeno = () => {
     return () => clearInterval(t);
   }, []);
 
-  // ---------- live draws ----------
+  // ---------- socket events ----------
   useEffect(() => {
     const onDraw = (d) => {
       setClockOffset(d.serverNow - Date.now());
@@ -126,8 +186,8 @@ const FastKeno = () => {
         closeAt: d.nextDrawAt - (config?.BET_CLOSE_MS ?? 5000),
       });
       setLastDraw({ drawId: d.drawId, numbers: d.numbers });
-      setHistory((h) =>
-        [{ drawId: d.drawId, numbers: d.numbers, ...summarize(d.numbers) }, ...h.filter((x) => x.drawId !== d.drawId)].slice(0, 10)
+      setResults((r) =>
+        [{ drawId: d.drawId, drawAt: d.drawId * 60000, numbers: d.numbers, ...summarize(d.numbers) }, ...r.filter((x) => x.drawId !== d.drawId)].slice(0, 30)
       );
 
       clearInterval(revealTimer.current);
@@ -144,9 +204,28 @@ const FastKeno = () => {
         }
       }, REVEAL_STEP_MS);
     };
+
+    const onBet = ({ tickets: incoming }) => {
+      const mine = incoming.filter((t) => t.drawId === liveDrawId.current);
+      if (!mine.length) return;
+      setLive((l) => {
+        const known = new Set(l.list.map((t) => t.id));
+        const fresh = mine.filter((t) => !known.has(t.id));
+        if (!fresh.length) return l;
+        const list = [...fresh, ...l.list];
+        return { ...l, list, tickets: list.length, players: new Set(list.map((t) => t.name)).size };
+      });
+    };
+
+    const onOnline = ({ online: n }) => setOnline(n);
+
     socket.on("keno:draw", onDraw);
+    socket.on("keno:bet", onBet);
+    socket.on("keno:online", onOnline);
     return () => {
       socket.off("keno:draw", onDraw);
+      socket.off("keno:bet", onBet);
+      socket.off("keno:online", onOnline);
       clearInterval(revealTimer.current);
     };
   }, [config, loadMine]);
@@ -160,6 +239,7 @@ const FastKeno = () => {
     const t = setTimeout(() => {
       loadState();
       loadMine();
+      loadResults();
     }, wait);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,6 +261,7 @@ const FastKeno = () => {
   const betType = mode === "numbers" ? "numbers" : sideChoice[mode];
   const safeStake = clampStake(stake);
   const totalCost = safeStake * draws;
+  const myOpenTickets = tickets.filter((t) => t.status === "pending");
 
   const rows = useMemo(() => {
     const row = paytable[picks.length] || {};
@@ -238,232 +319,300 @@ const FastKeno = () => {
     }
   };
 
+  // ---------- pieces ----------
+  const Badge = ({ type }) => {
+    const b = BADGE[type] || BADGE.numbers;
+    return <span className={`kn-badge ${b.cls}`}>{b.text}</span>;
+  };
+
+  const PickChips = ({ nums, drawn }) => (
+    <div className="kn-chips">
+      {nums.map((n) => (
+        <span key={n} className={`kn-chip ${drawn && drawn.has(n) ? "hit" : ""}`}>{n}</span>
+      ))}
+    </div>
+  );
+
   // ---------- render ----------
   return (
     <div className="keno">
       <div className="keno-inner">
-      <header className="keno-top">
-        <div className="keno-title">🎱 Fast Keno</div>
-        <div className="keno-wallet">💰 {wallet === null ? "—" : wallet.toFixed(2)}</div>
-      </header>
-
-      <section className="keno-timer">
-        <div className="keno-timer-row">
-          <span>Draw #{nextDraw.id ?? "—"}</span>
-          <span className={bettingOpen ? "open" : "closed"}>
-            {bettingOpen ? `Draw in ${secondsToDraw}s` : "Betting closed — drawing…"}
-          </span>
-        </div>
-        <div className="keno-bar">
-          <div className="keno-bar-fill" style={{ width: `${progress}%` }} />
-        </div>
-      </section>
-
-      <section className="keno-last">
-        <div className="keno-section-label keno-last-head">
-          <span>Last draw {lastDraw ? `#${lastDraw.drawId}` : ""}</span>
-          {lastSummary && (
-            <span className="keno-outcomes">
-              <span className="keno-tag">{OUTCOME_LABEL[lastSummary.headsTails]} {lastSummary.headsCount}–{20 - lastSummary.headsCount}</span>
-              <span className="keno-tag">{OUTCOME_LABEL[lastSummary.oddEven]} {lastSummary.oddCount}–{20 - lastSummary.oddCount}</span>
-            </span>
-          )}
-        </div>
-        <div className="keno-balls">
-          {revealed.length === 0 && <span className="keno-muted">Waiting for the next draw…</span>}
-          {revealed.map((n) => (
-            <span key={n} className={`keno-ball ${n > 40 ? "tail" : ""} ${pickSet.has(n) ? "hit" : ""}`}>{n}</span>
-          ))}
-        </div>
-      </section>
-
-      <div className="keno-tabs">
-        {MODES.map((m) => (
-          <button key={m.id} className={`keno-tab ${mode === m.id ? "active" : ""}`} onClick={() => setMode(m.id)}>
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      {mode === "numbers" ? (
-        <section className="keno-grid">
-          {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => {
-            const picked = pickSet.has(n);
-            const drawn = drawSet.has(n);
-            return (
-              <button
-                key={n}
-                className={`keno-cell ${n === 41 ? "split" : ""} ${picked ? "picked" : ""} ${drawn ? "drawn" : ""} ${picked && drawn ? "hit" : ""}`}
-                onClick={() => togglePick(n)}
-              >
-                {n}
-              </button>
-            );
-          })}
-        </section>
-      ) : (
-        <section className="keno-side">
-          <p className="keno-muted">
-            {mode === "ht"
-              ? "Heads wins if more of the 20 numbers are 1–40, Tails if more are 41–80. Evens wins on a 10–10 split."
-              : "Odd wins if more of the 20 numbers are odd, Even if more are even. Evens wins on a 10–10 split."}
-          </p>
-          <div className="keno-side-options">
-            {SIDE_OPTIONS[mode].map((b) => (
-              <button
-                key={b}
-                className={`keno-side-btn ${sideChoice[mode] === b ? "active" : ""} ${b.includes("evens") ? "evens" : ""}`}
-                onClick={() => setSideChoice((s) => ({ ...s, [mode]: b }))}
-              >
-                <span>{BET_LABEL[b].replace("H/T ", "").replace("O/E ", "")}</span>
-                <strong>×{sideBets[b]?.multiplier ?? "—"}</strong>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="keno-controls">
-        {mode === "numbers" && (
-          <div className="keno-row">
-            <span className="keno-muted">{picks.length}/{maxPicks} picked</span>
-            <div className="keno-row-btns">
-              <button className="keno-ghost" onClick={quickPick}>🎲 Quick pick</button>
-              <button className="keno-ghost" onClick={() => setPicks([])}>Clear</button>
+        {/* header */}
+        <header className="kn-head">
+          <div>
+            <div className="kn-title">Fast Keno</div>
+            <div className="kn-sub">
+              Draw #{nextDraw.id ?? "—"} ·{" "}
+              <span className={bettingOpen ? "kn-open" : "kn-closed"}>
+                {bettingOpen ? `${secondsToDraw}s left` : "Drawing…"}
+              </span>
             </div>
           </div>
-        )}
+          <div className="kn-wallet">{wallet === null ? "—" : wallet.toFixed(2)} ETB</div>
+        </header>
+        <div className="kn-bar"><div className="kn-bar-fill" style={{ width: `${progress}%` }} /></div>
 
-        <div className="keno-field-label">Stake per draw (birr)</div>
-        <div className="keno-stake-box">
-          <button
-            className="keno-step"
-            onClick={() => setStake((v) => clampStake(v - 1))}
-            disabled={stake <= minStake}
-            aria-label="Decrease stake"
-          >
-            −
-          </button>
-          <input
-            className="keno-stake-input"
-            type="number"
-            inputMode="numeric"
-            min={minStake}
-            max={maxStake}
-            value={stake}
-            onChange={(e) => setStake(e.target.value === "" ? "" : Number(e.target.value))}
-            onBlur={() => setStake((v) => clampStake(v))}
-          />
-          <button
-            className="keno-step"
-            onClick={() => setStake((v) => clampStake(v + 1))}
-            disabled={stake >= maxStake}
-            aria-label="Increase stake"
-          >
-            +
-          </button>
+        {/* stats strip (like the GK / DEF / MID strip) */}
+        <div className="kn-stats">
+          <div><span>PLAYERS</span><strong>{live.players}</strong></div>
+          <div><span>TICKETS</span><strong>{live.tickets}</strong></div>
+          <div><span>ONLINE</span><strong>{online}</strong></div>
+          <div><span>MY OPEN</span><strong>{myOpenTickets.length}</strong></div>
         </div>
-        <div className="keno-stake-hint">Min {minStake} · Max {maxStake}</div>
 
-        <div className="keno-field-label">Play for</div>
-        <div className="keno-draws">
-          {drawOptions.map((d) => (
-            <button key={d} className={`keno-chip ${draws === d ? "active" : ""}`} onClick={() => setDraws(d)}>
-              {d} draw{d > 1 ? "s" : ""}
+        {/* main tabs */}
+        <div className="kn-tabs">
+          {TABS.map((t) => (
+            <button key={t.id} className={`kn-tab ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
+              {t.label}
             </button>
           ))}
         </div>
 
-        <button
-          className="keno-bet"
-          disabled={placing || (betType === "numbers" && !picks.length)}
-          onClick={placeBet}
-        >
-          {placing
-            ? "Placing…"
-            : `Bet ${totalCost} birr — ${BET_LABEL[betType]}${draws > 1 ? ` × ${draws} draws` : ""}`}
-        </button>
-      </section>
-
-      {mode === "numbers" && (
-        <section className="keno-paytable">
-          <div className="keno-section-label">
-            Paytable {picks.length ? `— ${picks.length} pick${picks.length > 1 ? "s" : ""}` : ""}
-          </div>
-          {picks.length === 0 ? (
-            <p className="keno-muted">Pick numbers to see what you can win.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr><th>Matches</th><th>Pays</th><th>You win</th></tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.matches}>
-                    <td>{r.matches}</td>
-                    <td>×{r.mult}</td>
-                    <td>{Math.min(safeStake * r.mult, config?.MAX_WIN_PER_TICKET ?? Infinity).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      )}
-
-      <p className="keno-fine">
-        20 of 80 numbers are drawn at random every minute. Prizes come from fixed tables, so everyone
-        has the same chance. On average every bet type pays back about 80% of stakes.
-        {config ? ` Max win per ticket: ${config.MAX_WIN_PER_TICKET.toLocaleString()} birr.` : ""}
-      </p>
-
-      <section className="keno-tickets">
-        <div className="keno-section-label">My tickets</div>
-        {tickets.length === 0 && <p className="keno-muted">No tickets yet.</p>}
-        {tickets.map((t) => (
-          <div key={t._id} className={`keno-ticket ${t.status}`}>
-            <div className="keno-ticket-head">
-              <span>
-                Draw #{t.drawId} · {BET_LABEL[t.betType || "numbers"]}
-              </span>
-              <span>
-                {t.status === "pending" && "⏳ Waiting"}
-                {t.status === "won" && `🎉 +${t.payout}`}
-                {t.status === "lost" && ((t.betType || "numbers") === "numbers" ? `${t.matches} match${t.matches === 1 ? "" : "es"}` : "Lost")}
-              </span>
-            </div>
-            {(t.betType || "numbers") === "numbers" && (
-              <div className="keno-ticket-picks">
-                {t.picks.map((n) => (
-                  <span key={n}>{n}</span>
+        {/* ===================== PLAY ===================== */}
+        {tab === "play" && (
+          <>
+            <section className="kn-card">
+              <div className="kn-card-head">
+                <span>Last draw {lastDraw ? `#${lastDraw.drawId}` : ""}</span>
+                {lastSummary && (
+                  <span className="kn-tags">
+                    <span className="kn-tag">{OUTCOME_LABEL[lastSummary.headsTails]} {lastSummary.headsCount}–{20 - lastSummary.headsCount}</span>
+                    <span className="kn-tag">{OUTCOME_LABEL[lastSummary.oddEven]} {lastSummary.oddCount}–{20 - lastSummary.oddCount}</span>
+                  </span>
+                )}
+              </div>
+              <div className="kn-balls">
+                {revealed.length === 0 && <span className="kn-muted">Waiting for the next draw…</span>}
+                {revealed.map((n) => (
+                  <span key={n} className={`kn-ball ${n > 40 ? "tail" : ""} ${pickSet.has(n) ? "hit" : ""}`}>{n}</span>
                 ))}
               </div>
+            </section>
+
+            <div className="kn-pills">
+              {MODES.map((m) => (
+                <button key={m.id} className={`kn-pill ${mode === m.id ? "active" : ""}`} onClick={() => setMode(m.id)}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {mode === "numbers" ? (
+              <section className="kn-grid">
+                {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => {
+                  const picked = pickSet.has(n);
+                  const drawn = drawSet.has(n);
+                  return (
+                    <button
+                      key={n}
+                      className={`kn-cell ${picked ? "picked" : ""} ${drawn ? "drawn" : ""} ${picked && drawn ? "hit" : ""}`}
+                      onClick={() => togglePick(n)}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
+              </section>
+            ) : (
+              <section className="kn-card">
+                <p className="kn-muted kn-mt0">
+                  {mode === "ht"
+                    ? "Heads wins if more of the 20 numbers are 1–40, Tails if more are 41–80. Evens wins on a 10–10 split."
+                    : "Odd wins if more of the 20 numbers are odd, Even if more are even. Evens wins on a 10–10 split."}
+                </p>
+                <div className="kn-side">
+                  {SIDE_OPTIONS[mode].map((b) => (
+                    <button
+                      key={b}
+                      className={`kn-side-btn ${sideChoice[mode] === b ? "active" : ""} ${b.includes("evens") ? "evens" : ""}`}
+                      onClick={() => setSideChoice((s) => ({ ...s, [mode]: b }))}
+                    >
+                      <span>{BET_LABEL[b].replace("H/T ", "").replace("O/E ", "")}</span>
+                      <strong>×{sideBets[b]?.multiplier ?? "—"}</strong>
+                    </button>
+                  ))}
+                </div>
+              </section>
             )}
-            <div className="keno-muted">
-              Stake {t.stake}
-              {t.groupSize > 1 ? ` · part of a ${t.groupSize}-draw ticket` : ""}
-            </div>
-          </div>
-        ))}
-      </section>
 
-      {history.length > 1 && (
-        <section className="keno-history">
-          <div className="keno-section-label">Previous draws</div>
-          {history.slice(1).map((d) => {
-            const s = summarize(d.numbers);
-            return (
-              <div key={d.drawId} className="keno-history-row">
-                <span className="keno-muted">#{d.drawId}</span>
-                <span className="keno-history-nums">{d.numbers.join(" ")}</span>
-                <span className="keno-history-tags">
-                  {OUTCOME_LABEL[s.headsTails]} · {OUTCOME_LABEL[s.oddEven]}
-                </span>
+            {/* my selection */}
+            <section className="kn-card">
+              <div className="kn-card-head">
+                <span>My selection</span>
+                {mode === "numbers" && (
+                  <span className="kn-row-btns">
+                    <button className="kn-ghost" onClick={quickPick}>🎲 Auto</button>
+                    <button className="kn-ghost" onClick={() => setPicks([])}>Reset</button>
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </section>
-      )}
+              {mode === "numbers" ? (
+                picks.length ? (
+                  <>
+                    <PickChips nums={[...picks].sort((a, b) => a - b)} />
+                    <div className="kn-muted kn-mt6">{picks.length}/{maxPicks} picked</div>
+                  </>
+                ) : (
+                  <p className="kn-muted kn-mt0">Tap numbers on the board, or press Auto.</p>
+                )
+              ) : (
+                <div className="kn-selected-side"><Badge type={betType} /> {BET_LABEL[betType]} · pays ×{sideBets[betType]?.multiplier ?? "—"}</div>
+              )}
+
+              <div className="kn-label">Stake per draw (ETB)</div>
+              <div className="kn-stake">
+                <button className="kn-step" onClick={() => setStake((v) => clampStake(v - 1))} disabled={safeStake <= minStake} aria-label="Decrease stake">−</button>
+                <input
+                  className="kn-stake-input"
+                  type="number"
+                  inputMode="numeric"
+                  min={minStake}
+                  max={maxStake}
+                  value={stake}
+                  onChange={(e) => setStake(e.target.value === "" ? "" : Number(e.target.value))}
+                  onBlur={() => setStake((v) => clampStake(v))}
+                />
+                <button className="kn-step" onClick={() => setStake((v) => clampStake(v + 1))} disabled={safeStake >= maxStake} aria-label="Increase stake">+</button>
+              </div>
+              <div className="kn-hint">Min {minStake} · Max {maxStake}</div>
+
+              <div className="kn-label">Play for</div>
+              <div className="kn-draws">
+                {drawOptions.map((d) => (
+                  <button key={d} className={`kn-pill ${draws === d ? "active" : ""}`} onClick={() => setDraws(d)}>
+                    {d} draw{d > 1 ? "s" : ""}
+                  </button>
+                ))}
+              </div>
+
+              <button className="kn-bet" disabled={placing || (betType === "numbers" && !picks.length)} onClick={placeBet}>
+                {placing ? "Placing…" : `Bet ${totalCost} ETB — ${BET_LABEL[betType]}${draws > 1 ? ` × ${draws}` : ""}`}
+              </button>
+
+              {mode === "numbers" && picks.length > 0 && (
+                <table className="kn-paytable">
+                  <thead><tr><th>Matches</th><th>Pays</th><th>You win</th></tr></thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.matches}>
+                        <td>{r.matches}</td>
+                        <td>×{r.mult}</td>
+                        <td className="kn-green">{Math.min(safeStake * r.mult, config?.MAX_WIN_PER_TICKET ?? Infinity).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+
+            {/* live players in this draw */}
+            <section className="kn-list">
+              <div className="kn-list-head">
+                <span>Players in draw #{live.drawId ?? "—"}</span>
+                <span className="kn-live"><i /> LIVE · {live.players} player{live.players === 1 ? "" : "s"}</span>
+              </div>
+              {live.list.length === 0 && <p className="kn-muted kn-pad">No tickets yet for this draw. Be the first!</p>}
+              {live.list.map((t) => (
+                <div key={t.id} className={`kn-row ${myName && t.name === myName ? "me" : ""}`}>
+                  <div className="kn-avatar">
+                    {Array.from((t.name || "").replace(/[^\p{L}\p{N}]/gu, ""))[0]?.toUpperCase() || "?"}
+                    <Badge type={t.betType} />
+                  </div>
+                  <div className="kn-row-main">
+                    <div className="kn-row-name">{t.name}{myName && t.name === myName ? " (you)" : ""}</div>
+                    {t.betType === "numbers" ? (
+                      <PickChips nums={t.picks} />
+                    ) : (
+                      <div className="kn-muted">{BET_LABEL[t.betType]}</div>
+                    )}
+                  </div>
+                  <div className="kn-row-right">
+                    <span className="kn-star">★ {t.betType === "numbers" ? t.picks.length : "—"}</span>
+                    <span className="kn-green">{t.stake}</span>
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            <p className="kn-fine">
+              20 of 80 numbers are drawn at random every minute. Prizes come from fixed tables, so everyone has the
+              same chance. On average every bet type pays back about 80% of stakes.
+              {config ? ` Max win per ticket: ${config.MAX_WIN_PER_TICKET.toLocaleString()} ETB.` : ""}
+            </p>
+          </>
+        )}
+
+        {/* ===================== HISTORY ===================== */}
+        {tab === "history" && (
+          <section className="kn-list">
+            <div className="kn-list-head">
+              <span>My tickets</span>
+              <span className="kn-muted">last {tickets.length}</span>
+            </div>
+            {tickets.length === 0 && <p className="kn-muted kn-pad">No tickets yet. Place a bet in the Play tab.</p>}
+            {tickets.map((t) => {
+              const draw = results.find((d) => d.drawId === t.drawId);
+              const drawn = draw ? new Set(draw.numbers) : null;
+              const type = t.betType || "numbers";
+              return (
+                <div key={t._id} className={`kn-row ${t.status}`}>
+                  <div className="kn-avatar small">
+                    #{String(t.drawId).slice(-3)}
+                    <Badge type={type} />
+                  </div>
+                  <div className="kn-row-main">
+                    <div className="kn-row-name">
+                      Draw #{t.drawId} · {BET_LABEL[type]}
+                    </div>
+                    {type === "numbers" ? <PickChips nums={t.picks} drawn={drawn} /> : null}
+                    <div className="kn-muted">
+                      Stake {t.stake} ETB{t.groupSize > 1 ? ` · ${t.groupSize}-draw ticket` : ""} · {timeOf(t.createdAt)}
+                    </div>
+                  </div>
+                  <div className="kn-row-right">
+                    {t.status === "pending" && <span className="kn-muted">⏳ Waiting</span>}
+                    {t.status === "won" && <span className="kn-green kn-big">+{t.payout}</span>}
+                    {t.status === "lost" && (
+                      <span className="kn-muted">{type === "numbers" ? `${t.matches} hit${t.matches === 1 ? "" : "s"}` : "Lost"}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        {/* ===================== RESULTS ===================== */}
+        {tab === "results" && (
+          <section className="kn-list">
+            <div className="kn-list-head">
+              <span>Draw results</span>
+              <span className="kn-muted">last {results.length}</span>
+            </div>
+            {results.length === 0 && <p className="kn-muted kn-pad">No draws yet.</p>}
+            {results.map((d) => {
+              const s = summarize(d.numbers);
+              return (
+                <div key={d.drawId} className="kn-result">
+                  <div className="kn-result-head">
+                    <span className="kn-row-name">Draw #{d.drawId}</span>
+                    <span className="kn-muted">{d.drawAt ? timeOf(d.drawAt) : ""}</span>
+                  </div>
+                  <div className="kn-result-balls">
+                    {d.numbers.map((n) => (
+                      <span key={n} className={`kn-mini ${n > 40 ? "tail" : ""}`}>{n}</span>
+                    ))}
+                  </div>
+                  <div className="kn-tags">
+                    <span className={`kn-tag ${s.headsTails}`}>{OUTCOME_LABEL[s.headsTails]} {s.headsCount}–{20 - s.headsCount}</span>
+                    <span className={`kn-tag ${s.oddEven}`}>{OUTCOME_LABEL[s.oddEven]} {s.oddCount}–{20 - s.oddCount}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        )}
       </div>
     </div>
   );

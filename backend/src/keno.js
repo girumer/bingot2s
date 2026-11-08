@@ -155,6 +155,16 @@ function drawSummary(numbers) {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+// Name shown to other players. Phone-number usernames are partly hidden.
+function displayName(username) {
+  const name = String(username || "Player").trim();
+  const digits = name.replace(/\D/g, "");
+  if (digits.length >= 7 && digits.length >= name.replace(/[\s+\-()]/g, "").length - 1) {
+    return `${name.slice(0, 4)}****${name.slice(-2)}`;
+  }
+  return name.length > 18 ? `${name.slice(0, 17)}…` : name;
+}
+
 // Score one ticket against a draw.
 function scoreTicket(ticket, drawn) {
   const { betType = "numbers", picks = [], stake } = ticket;
@@ -238,6 +248,63 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
       console.error("[KENO] ledger write failed:", err.message, entry);
     }
   }
+
+  // Public view of a ticket for the live players list (no Telegram ids).
+  const publicTicket = (t) => ({
+    id: String(t._id),
+    drawId: t.drawId,
+    name: displayName(t.username),
+    betType: t.betType || "numbers",
+    picks: t.picks || [],
+    stake: t.stake,
+    createdAt: t.createdAt,
+  });
+
+  // ---- Live presence: who has the keno page open ----
+  io.on("connection", (socket) => {
+    socket.on("keno:join", () => {
+      socket.join("keno");
+      socket.emit("keno:online", { online: onlineCount() });
+    });
+    socket.on("keno:leave", () => socket.leave("keno"));
+  });
+  function onlineCount() {
+    return io.sockets?.adapter?.rooms?.get("keno")?.size || 0;
+  }
+
+  // ---- Players and tickets in one draw (for the live list) ----
+  app.get("/api/keno/players", async (req, res) => {
+    try {
+      const drawId = Number(req.query.drawId) || openDrawId();
+      const tickets = await KenoTicket.find({ drawId }).sort({ createdAt: -1 }).limit(200).lean();
+      const players = new Set(tickets.map((t) => t.telegramId)).size;
+      res.json({
+        drawId,
+        players,
+        tickets: tickets.length,
+        online: onlineCount(),
+        list: tickets.map(publicTicket),
+      });
+    } catch (err) {
+      console.error("[KENO] players error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // ---- Past results (Results tab) ----
+  app.get("/api/keno/results", async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+      const draws = await KenoDraw.find({}, { _id: 0, drawId: 1, drawAt: 1, numbers: 1 })
+        .sort({ drawId: -1 })
+        .limit(limit)
+        .lean();
+      res.json({ draws: draws.map((d) => ({ ...d, ...drawSummary(d.numbers) })) });
+    } catch (err) {
+      console.error("[KENO] results error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
 
   // ---- Public state: next draw, recent results, paytables ----
   app.get("/api/keno/state", async (req, res) => {
@@ -364,6 +431,9 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
         wallet: round2(player.Wallet),
         firstDrawAt: drawTimeOf(firstDrawId),
       });
+
+      // Tell everyone on the keno page about the new ticket(s).
+      io.emit("keno:bet", { tickets: tickets.map(publicTicket) });
     } catch (err) {
       console.error("[KENO] bet error:", err);
       res.status(500).json({ error: "Server error" });
@@ -544,6 +614,8 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
   if (isLeader) {
     lastSettledDrawId = drawIdAt(Date.now()) - 2;
     setInterval(tick, 1000);
+    // Online count for everyone with the keno page open, every 5 seconds.
+    setInterval(() => io.to("keno").emit("keno:online", { online: onlineCount() }), 5000);
     console.log("[KENO] Draw loop started.");
   }
 }
