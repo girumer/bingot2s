@@ -93,6 +93,8 @@ const FastKeno = () => {
   const [online, setOnline] = useState(0);
 
   const revealTimer = useRef(null);
+  const picksRef = useRef([]);
+  const picksAtDraw = useRef("");
   const liveDrawId = useRef(null);
 
   // ---------- data loading ----------
@@ -187,8 +189,8 @@ const FastKeno = () => {
       });
       setLastDraw({ drawId: d.drawId, numbers: d.numbers });
 
-      // Clear the board so the same numbers aren't bet again by accident.
-      setPicks([]);
+      // Remember the board as it was when the draw started.
+      picksAtDraw.current = picksRef.current.slice().sort((a, b) => a - b).join(",");
 
       clearInterval(revealTimer.current);
       setRevealed([]);
@@ -200,6 +202,9 @@ const FastKeno = () => {
         if (i >= d.numbers.length) {
           clearInterval(revealTimer.current);
           setRevealDone(true);
+          // Game over: clear the board so the same numbers aren't bet again by accident.
+          // If the player already picked new numbers during the draw, keep those.
+          setPicks((p) => (p.slice().sort((a, b) => a - b).join(",") === picksAtDraw.current ? [] : p));
           // Only now show the result in the Results tab and update wallet/tickets.
           setResults((r) =>
             [{ drawId: d.drawId, drawAt: d.drawId * 60000, numbers: d.numbers, ...summarize(d.numbers) }, ...r.filter((x) => x.drawId !== d.drawId)].slice(0, 30)
@@ -249,6 +254,8 @@ const FastKeno = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextDraw.at]);
 
+  picksRef.current = picks;
+
   // ---------- derived ----------
   const maxPicks = config?.MAX_PICKS ?? 10;
   const minStake = config?.MIN_STAKE ?? 7;
@@ -274,6 +281,15 @@ const FastKeno = () => {
   }, [tickets, lastDraw]);
   const calling = !revealDone && revealed.length > 0;
   const latestCalled = revealed[revealed.length - 1];
+  const drawingTickets = lastDraw ? tickets.filter((t) => t.drawId === lastDraw.drawId) : [];
+  const waitingTickets = tickets.filter((t) => t.drawId === nextDraw.id && t.drawId !== lastDraw?.drawId);
+  const myHitsNow = drawingTickets.reduce(
+    (sum, t) => sum + ((t.betType || "numbers") === "numbers" ? t.picks.filter((n) => drawSet.has(n)).length : 0),
+    0
+  );
+  const myPicksTotal = drawingTickets.reduce((sum, t) => sum + ((t.betType || "numbers") === "numbers" ? t.picks.length : 0), 0);
+  const calledHeads = revealed.filter((n) => n <= 40).length;
+  const calledOdd = revealed.filter((n) => n % 2 === 1).length;
 
   const rows = useMemo(() => {
     const row = paytable[picks.length] || {};
@@ -337,13 +353,67 @@ const FastKeno = () => {
     return <span className={`kn-badge ${b.cls}`}>{b.text}</span>;
   };
 
-  const PickChips = ({ nums, drawn }) => (
+  // done = the draw is finished, so numbers that weren't called are shown as missed
+  const PickChips = ({ nums, drawn, done }) => (
     <div className="kn-chips">
-      {nums.map((n) => (
-        <span key={n} className={`kn-chip ${drawn && drawn.has(n) ? "hit" : ""}`}>{n}</span>
-      ))}
+      {nums.map((n) => {
+        const hit = drawn && drawn.has(n);
+        return (
+          <span key={n} className={`kn-chip ${hit ? "hit" : done ? "miss" : ""}`}>{n}</span>
+        );
+      })}
     </div>
   );
+
+  // A ticket in the draw being called (live highlights) or waiting for the next draw.
+  const LiveTicket = ({ t, live }) => {
+    const type = t.betType || "numbers";
+    const done = live && revealDone;
+    const settled = t.status !== "pending";
+    const hits = type === "numbers" && live ? t.picks.filter((n) => drawSet.has(n)) : [];
+    const misses = done && type === "numbers" ? t.picks.filter((n) => !drawSet.has(n)) : [];
+    const currentMult = type === "numbers" ? paytable[t.picks.length]?.[hits.length] || 0 : 0;
+    return (
+      <div className={`kn-ticket ${done && settled ? t.status : ""}`}>
+        <div className="kn-ticket-top">
+          <span className="kn-ticket-title"><Badge type={type} /> {BET_LABEL[type]} · {t.stake} ETB</span>
+          <span className="kn-ticket-state">
+            {!live && <span className="kn-muted">⏳ Waiting for draw #{t.drawId}</span>}
+            {live && !done && type === "numbers" && <span className="kn-gold">{hits.length} / {t.picks.length} hit</span>}
+            {live && !done && type !== "numbers" && <span className="kn-muted">Calling…</span>}
+            {done && settled && t.status === "won" && <span className="kn-green kn-big">WON +{t.payout}</span>}
+            {done && settled && t.status === "lost" && <span className="kn-red">No win</span>}
+            {done && !settled && <span className="kn-muted">Checking…</span>}
+          </span>
+        </div>
+        {type === "numbers" ? (
+          <PickChips nums={t.picks} drawn={live ? drawSet : null} done={done} />
+        ) : (
+          live && (
+            <div className="kn-side-live">
+              {["heads", "tails", "ht_evens"].includes(type)
+                ? `1–40: ${calledHeads}  ·  41–80: ${revealed.length - calledHeads}`
+                : `Odd: ${calledOdd}  ·  Even: ${revealed.length - calledOdd}`}
+            </div>
+          )
+        )}
+        {live && type === "numbers" && (
+          <div className="kn-ticket-foot">
+            {done ? (
+              <>
+                <span>Got: <b className="kn-gold">{hits.length ? hits.join(", ") : "none"}</b></span>
+                <span>Missed: <b className="kn-red">{misses.length ? misses.join(", ") : "none"}</b></span>
+              </>
+            ) : (
+              <span className="kn-muted">
+                {currentMult ? `Winning now: ${Math.min(t.stake * currentMult, config?.MAX_WIN_PER_TICKET ?? Infinity)} ETB` : "No prize yet — keep watching"}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ---------- render ----------
   return (
@@ -403,6 +473,12 @@ const FastKeno = () => {
                     <div className="kn-calling-label">Now calling</div>
                     <div className="kn-calling-count">{revealed.length} / 20</div>
                   </div>
+                  {myPicksTotal > 0 && (
+                    <div className="kn-calling-mine">
+                      <div className="kn-calling-label">Your hits</div>
+                      <div className="kn-calling-count kn-gold">{myHitsNow}</div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="kn-balls">
@@ -459,6 +535,30 @@ const FastKeno = () => {
               </section>
             )}
 
+            {/* my tickets: live during the draw, then result; plus tickets waiting for the next draw */}
+            {(drawingTickets.length > 0 || waitingTickets.length > 0) && (
+              <section className="kn-card">
+                {drawingTickets.length > 0 && (
+                  <>
+                    <div className="kn-card-head">
+                      <span>My ticket{drawingTickets.length > 1 ? "s" : ""} · Draw #{lastDraw.drawId}</span>
+                      <span className={calling ? "kn-gold" : "kn-muted"}>{calling ? `Calling ${revealed.length}/20` : "Result"}</span>
+                    </div>
+                    {drawingTickets.map((t) => <LiveTicket key={t._id} t={t} live />)}
+                  </>
+                )}
+                {waitingTickets.length > 0 && (
+                  <>
+                    <div className={`kn-card-head ${drawingTickets.length ? "kn-mt12" : ""}`}>
+                      <span>Next draw #{nextDraw.id}</span>
+                      <span className="kn-muted">{waitingTickets.length} ticket{waitingTickets.length > 1 ? "s" : ""}</span>
+                    </div>
+                    {waitingTickets.map((t) => <LiveTicket key={t._id} t={t} live={false} />)}
+                  </>
+                )}
+              </section>
+            )}
+
             {/* my selection */}
             <section className="kn-card">
               <div className="kn-card-head">
@@ -473,7 +573,7 @@ const FastKeno = () => {
               {mode === "numbers" ? (
                 picks.length ? (
                   <>
-                    <PickChips nums={[...picks].sort((a, b) => a - b)} />
+                    <PickChips nums={[...picks].sort((a, b) => a - b)} drawn={revealed.length ? drawSet : null} />
                     <div className="kn-muted kn-mt6">{picks.length}/{maxPicks} picked</div>
                   </>
                 ) : (

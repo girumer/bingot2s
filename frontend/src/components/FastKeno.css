@@ -402,3 +402,34 @@
   70% { transform: scale(1.12) rotate(0); opacity: 1; }
   100% { transform: scale(1); }
 }
+
+/* ---------- live ticket (hits light up as numbers are called) ---------- */
+.kn-gold { color: var(--gold); font-weight: 800; }
+.kn-red { color: var(--red); font-weight: 700; }
+.kn-mt12 { margin-top: 14px; }
+.kn-chip.hit { animation: kn-hit 0.5s ease-out; box-shadow: 0 0 10px rgba(237, 194, 26, 0.6); }
+.kn-chip.miss { background: transparent; border-color: #5a3340; color: #b77a86; text-decoration: line-through; }
+@keyframes kn-hit {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.kn-ticket {
+  background: var(--bg);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kn-ticket.won { border-color: var(--green); background: #17291f; }
+.kn-ticket.lost { opacity: 0.9; }
+.kn-ticket-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.kn-ticket-title { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.kn-ticket-state { font-size: 14px; white-space: nowrap; }
+.kn-ticket .kn-chip { min-width: 36px; padding: 7px 6px; font-size: 15px; }
+.kn-ticket-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.kn-side-live { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kn-calling-mine { margin-left: auto; text-align: right; }
