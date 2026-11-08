@@ -669,3 +669,49 @@
   line-height: 1;
 }
 .kn-cell.picked.last::after { color: #ffe0e0; }
+
+/* ================= v11: compact stage (2 rows of 10) and smaller tickets ================= */
+.kd-stage, .kd-stage.checking { height: auto; min-height: 0; padding: 40px 10px 14px; }
+.kd-stage.checking { padding-top: 46px; }
+.kd-rings i { left: 50%; top: 92px; }
+.kd-center { height: 112px; display: grid; place-items: center; position: relative; z-index: 2; }
+.kd-stage.checking .kd-center { height: 0; }
+.kd-big { position: static; margin: 0; width: 96px; height: 96px; font-size: 42px; }
+.kd-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+  margin-top: 8px;
+}
+.kd-grid .kd-ball {
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
+  font-size: clamp(13px, 4vw, 18px);
+  border-width: 1.5px;
+}
+.kd-grid .kd-ball.empty {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px dashed rgba(143, 179, 196, 0.25);
+  box-shadow: none;
+  animation: none;
+}
+.kd-grid .kd-ball:not(.empty) { animation: kd-pop 0.45s ease-out; }
+@keyframes kd-pop { 0% { transform: scale(0.3); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+
+/* smaller ticket cards so more players fit on screen */
+.kt-card { padding: 6px 6px 6px; margin-bottom: 6px; border-radius: 6px; }
+.kt-id { font-size: 13px; margin: 0 2px 4px; gap: 6px; }
+.kt-you { font-size: 9px; padding: 0 4px; }
+.kt-slots { gap: 3px; margin-bottom: 4px; }
+.kt-slot { aspect-ratio: 1 / 0.8; font-size: clamp(12px, 3.6vw, 15px); border-radius: 3px; }
+.kt-slot.wide { padding: 5px 0; font-size: 13px; }
+.kt-foot { gap: 4px; }
+.kt-bet, .kt-status { font-size: 13px; padding: 4px 8px; border-radius: 3px; }
+.kt-card.won { background: #2b5a3f; box-shadow: none; }
+.kt-card.won .kt-bet, .kt-card.won .kt-status { background: #24473a; }
+.kt-slot.hit { background: #5cc27c; box-shadow: none; }
+.kt-tabs { padding: 8px 6px; }
+.kt-tabs button { font-size: 14px; }

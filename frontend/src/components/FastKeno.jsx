@@ -396,7 +396,9 @@ const FastKeno = () => {
   const myGameTickets = tickets.filter((t) => t.drawId === listDrawId).map(asCard);
   const myBets = tickets.filter((t) => t.drawId >= (listDrawId || 0)).map(asCard);
   const renderTicketBoard = ({ drawn, done }) => {
-    const list = listFilter === "all" ? live.list : listFilter === "mine" ? myGameTickets : myBets;
+    // In "All", the player's own tickets come first, then everyone else's.
+    const all = [...live.list.filter((t) => myIds.has(t.id)), ...live.list.filter((t) => !myIds.has(t.id))];
+    const list = listFilter === "all" ? all : listFilter === "mine" ? myGameTickets : myBets;
     return (
       <section className="kt-board">
         <div className="kt-tabs">
@@ -441,20 +443,19 @@ const FastKeno = () => {
             <section className={`kd-stage ${phase}`}>
               <div className="kd-rings"><i /><i /><i /><i /></div>
               <div className="kd-count">{pad2(called.length)}<em>/</em>20</div>
-              {phase === "drawing" ? (
-                <>
-                  <div className="kd-row">
-                    {called.slice(0, -1).slice(-6).map((n) => (
-                      <span key={n} className="kd-ball">{n}</span>
-                    ))}
-                  </div>
-                  {latest !== undefined && <div key={latest} className="kd-big">{latest}</div>}
-                </>
-              ) : (
-                <div className="kd-all">
-                  {called.map((n) => <span key={n} className="kd-ball sm">{n}</span>)}
-                </div>
-              )}
+              <div className="kd-center">
+                {phase === "drawing" && latest !== undefined && <div key={latest} className="kd-big">{latest}</div>}
+              </div>
+              <div className="kd-grid">
+                {Array.from({ length: 20 }, (_, i) => {
+                  const n = called[i];
+                  return n === undefined ? (
+                    <span key={`e${i}`} className="kd-ball empty" />
+                  ) : (
+                    <span key={n} className="kd-ball">{n}</span>
+                  );
+                })}
+              </div>
             </section>
 
             {renderTicketBoard({ drawn: calledSet, done: drawDone })}
