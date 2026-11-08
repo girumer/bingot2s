@@ -333,6 +333,8 @@ const FastKeno = () => {
       });
       setWallet(data.wallet);
       setTickets((t) => [...[...data.tickets].reverse(), ...t].slice(0, 30));
+      // Ticket placed: clear the board so the same numbers aren't bet twice by accident.
+      setPicks([]);
       toast.success(phase === "waiting" ? "Ticket placed — game starting!" : "Ticket placed");
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not place ticket.");
