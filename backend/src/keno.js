@@ -26,7 +26,7 @@ const mongoose = require("mongoose");
 const KENO_CONFIG = {
   // Game flow: waiting (no tickets, nothing runs) → betting countdown starts with
   // the first ticket → 20 numbers called one per second → short check pause → next game.
-  JOIN_WINDOW_MS: 15 * 1000,   // countdown after the first ticket so others can join
+  JOIN_WINDOW_MS: 35 * 1000,   // countdown after the first ticket so others can join
   BET_CLOSE_MS: 1 * 1000,      // tickets in the last second go to the next game
   CALL_INTERVAL_MS: 1000,      // one number called per second
   CHECK_WINDOW_MS: 5 * 1000,   // after the 20th number, time to check tickets

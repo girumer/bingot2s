@@ -259,7 +259,7 @@ const FastKeno = () => {
   const safeStake = clampStake(stake);
   const totalCost = safeStake * draws;
   const drawOptions = config?.MULTI_DRAW_OPTIONS ?? [1, 5, 10];
-  const joinMs = config?.JOIN_WINDOW_MS ?? 15000;
+  const joinMs = config?.JOIN_WINDOW_MS ?? 35000;
   const secondsLeft = round.drawAt ? Math.max(0, Math.ceil((round.drawAt - serverNow) / 1000)) : 0;
   const pickSet = useMemo(() => new Set(picks), [picks]);
   const betType = mode === "numbers" ? "numbers" : sideChoice[mode];
@@ -358,7 +358,7 @@ const FastKeno = () => {
 
   // One ticket card: masked name, 10 number boxes, bet amount and status.
   // drawn = numbers called so far (null before the draw); done = draw finished.
-  const TicketCard = ({ t, drawn, done, mine }) => {
+  const renderTicketCard = ({ t, drawn, done, mine }) => {
     const type = t.betType || "numbers";
     const prize = done && drawn ? prizeOf(t, [...drawn]) : 0;
     const status = !drawn ? { text: "Waiting", cls: "waiting" }
@@ -395,7 +395,7 @@ const FastKeno = () => {
   const asCard = (t) => ({ id: String(t._id), name: displayName(t.username || myName), betType: t.betType || "numbers", picks: t.picks || [], stake: t.stake, drawId: t.drawId });
   const myGameTickets = tickets.filter((t) => t.drawId === listDrawId).map(asCard);
   const myBets = tickets.filter((t) => t.drawId >= (listDrawId || 0)).map(asCard);
-  const TicketBoard = ({ drawn, done }) => {
+  const renderTicketBoard = ({ drawn, done }) => {
     const list = listFilter === "all" ? live.list : listFilter === "mine" ? myGameTickets : myBets;
     return (
       <section className="kt-board">
@@ -406,13 +406,14 @@ const FastKeno = () => {
         </div>
         {list.length === 0 && <p className="kn-muted kn-pad">No tickets yet.</p>}
         {list.map((t) => (
-          <TicketCard
-            key={t.id}
-            t={t}
-            mine={myIds.has(t.id)}
-            drawn={t.drawId === listDrawId ? drawn : null}
-            done={t.drawId === listDrawId ? done : false}
-          />
+          <React.Fragment key={t.id}>
+            {renderTicketCard({
+              t,
+              mine: myIds.has(t.id),
+              drawn: t.drawId === listDrawId ? drawn : null,
+              done: t.drawId === listDrawId ? done : false,
+            })}
+          </React.Fragment>
         ))}
       </section>
     );
@@ -456,7 +457,7 @@ const FastKeno = () => {
               )}
             </section>
 
-            <TicketBoard drawn={calledSet} done={drawDone} />
+            {renderTicketBoard({ drawn: calledSet, done: drawDone })}
           </>
         ) : (
           /* ================= NORMAL VIEW ================= */
@@ -596,7 +597,7 @@ const FastKeno = () => {
                   )}
                 </section>
 
-                <TicketBoard drawn={null} done={false} />
+                {renderTicketBoard({ drawn: null, done: false })}
 
                 <p className="kn-fine">
                   20 of 80 numbers are drawn at random, one per second. Prizes come from fixed tables, so everyone has the
