@@ -59,7 +59,12 @@ function summarize(numbers) {
 }
 const timeOf = (ms) =>
   new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Addis_Ababa" });
-const initialOf = (name) => Array.from(String(name || "").replace(/[^\p{L}\p{N}]/gu, ""))[0]?.toUpperCase() || "?";
+const maskName = (name) => {
+  const chars = Array.from(String(name || "player").trim());
+  if (chars.length <= 2) return `${chars[0] || "?"}***`;
+  return `${chars[0]}***${chars[chars.length - 1]}`;
+};
+const pad2 = (n) => String(n).padStart(2, "0");
 
 // ---------- small pieces ----------
 const Badge = ({ type }) => {
@@ -102,6 +107,7 @@ const FastKeno = () => {
 
   const [live, setLive] = useState({ drawId: null, players: 0, tickets: 0, list: [] });
   const [online, setOnline] = useState(0);
+  const [listFilter, setListFilter] = useState("all");
 
   const liveDrawId = useRef(null);
   const picksRef = useRef([]);
@@ -266,12 +272,8 @@ const FastKeno = () => {
   const latest = called[called.length - 1];
   const drawDone = phase === "checking";
 
-  const focusTickets = focus ? tickets.filter((t) => t.drawId === round.draw?.drawId) : [];
-  const openTickets = tickets.filter((t) => t.status === "pending" && (!focus || t.drawId !== round.draw?.drawId));
   const lastResult = results[0];
   const lastSummary = lastResult ? summarize(lastResult.numbers) : null;
-  const myLastTickets = lastResult ? tickets.filter((t) => t.drawId === lastResult.drawId) : [];
-  const lastSet = useMemo(() => new Set(lastResult?.numbers || []), [lastResult]);
 
   const progress =
     phase === "betting" ? Math.min(100, Math.max(0, 100 - ((round.drawAt - serverNow) / joinMs) * 100))
@@ -335,42 +337,82 @@ const FastKeno = () => {
     }
   };
 
-  // A ticket on screen. drawn = numbers to compare with; done = show misses.
-  const Ticket = ({ t, drawn, done, showWin }) => {
+  // Prize for any ticket against the called numbers (same tables the server uses).
+  const prizeOf = (t, numbers) => {
     const type = t.betType || "numbers";
-    const won = showWin && t.status === "won";
+    let mult = 0;
+    if (type === "numbers") {
+      const set = new Set(numbers);
+      mult = paytable[t.picks.length]?.[t.picks.filter((n) => set.has(n)).length] || 0;
+    } else {
+      const s2 = summarize(numbers);
+      const outcome = ["heads", "tails", "ht_evens"].includes(type) ? s2.headsTails : s2.oddEven;
+      mult = outcome === type ? sideBets[type]?.multiplier || 0 : 0;
+    }
+    return Math.min(Math.round(t.stake * mult * 100) / 100, config?.MAX_WIN_PER_TICKET ?? Infinity);
+  };
+
+  // One ticket card: masked name, 10 number boxes, bet amount and status.
+  // drawn = numbers called so far (null before the draw); done = draw finished.
+  const TicketCard = ({ t, drawn, done, mine }) => {
+    const type = t.betType || "numbers";
+    const prize = done && drawn ? prizeOf(t, [...drawn]) : 0;
+    const status = !drawn ? { text: "Waiting", cls: "waiting" }
+      : !done ? { text: "Playing", cls: "playing" }
+      : prize > 0 ? { text: `Won ${prize}`, cls: "won" }
+      : { text: "Lost", cls: "lost" };
     return (
-      <div className={`kn-ticket ${won ? "won" : ""}`}>
-        <div className="kn-ticket-top">
-          <span className="kn-ticket-title"><Badge type={type} /> {BET_LABEL[type]} · {t.stake} ETB</span>
-          {won && <span className="kn-win">+{t.payout}</span>}
+      <div className={`kt-card ${mine ? "mine" : ""} ${done && prize > 0 ? "won" : ""}`}>
+        <div className="kt-id">{t.name}{mine ? <span className="kt-you">YOU</span> : null}</div>
+        <div className="kt-slots">
+          {type === "numbers" ? (
+            Array.from({ length: 10 }, (_, i) => {
+              const n = t.picks[i];
+              if (n === undefined) return <span key={i} className="kt-slot empty" />;
+              const hit = drawn && drawn.has(n);
+              return <span key={i} className={`kt-slot ${hit ? "hit" : done ? "miss" : "filled"}`}>{n}</span>;
+            })
+          ) : (
+            <span className={`kt-slot wide filled ${done ? (prize > 0 ? "hit" : "miss") : ""}`}>
+              {BET_LABEL[type].toUpperCase()} ×{sideBets[type]?.multiplier ?? ""}
+            </span>
+          )}
         </div>
-        {type === "numbers" ? (
-          <PickChips nums={t.picks} drawn={drawn} done={done} />
-        ) : (
-          drawn && (
-            <div className="kn-side-live">
-              {["heads", "tails", "ht_evens"].includes(type)
-                ? <><span className="kn-blue">1–40: {[...drawn].filter((n) => n <= 40).length}</span> · <span className="kn-purple">41–80: {[...drawn].filter((n) => n > 40).length}</span></>
-                : <>Odd: {[...drawn].filter((n) => n % 2).length} · Even: {[...drawn].filter((n) => n % 2 === 0).length}</>}
-            </div>
-          )
-        )}
+        <div className="kt-foot">
+          <div className="kt-bet">Bet {t.stake}</div>
+          <div className={`kt-status ${status.cls}`}>{status.text}</div>
+        </div>
       </div>
     );
   };
 
-  const PlayerRows = ({ list, drawn, done }) =>
-    list.map((t) => (
-      <div key={t.id} className={`kn-row ${myName && t.name === myName ? "me" : ""}`}>
-        <div className="kn-avatar">{initialOf(t.name)}<Badge type={t.betType} /></div>
-        <div className="kn-row-main">
-          <div className="kn-row-name">{t.name}{myName && t.name === myName ? " (you)" : ""}</div>
-          {t.betType === "numbers" ? <PickChips nums={t.picks} drawn={drawn} done={done} /> : <div className="kn-muted">{BET_LABEL[t.betType]}</div>}
+  // Ticket list with All / My Tickets / My Bets filters.
+  const myIds = new Set(tickets.map((t) => String(t._id)));
+  const asCard = (t) => ({ id: String(t._id), name: maskName(myName), betType: t.betType || "numbers", picks: t.picks || [], stake: t.stake, drawId: t.drawId });
+  const myGameTickets = tickets.filter((t) => t.drawId === listDrawId).map(asCard);
+  const myBets = tickets.filter((t) => t.drawId >= (listDrawId || 0)).map(asCard);
+  const TicketBoard = ({ drawn, done }) => {
+    const list = listFilter === "all" ? live.list : listFilter === "mine" ? myGameTickets : myBets;
+    return (
+      <section className="kt-board">
+        <div className="kt-tabs">
+          <button className={listFilter === "all" ? "active" : ""} onClick={() => setListFilter("all")}>All <b>{live.list.length}</b></button>
+          <button className={listFilter === "mine" ? "active" : ""} onClick={() => setListFilter("mine")}>My Tickets <b>{myGameTickets.length}</b></button>
+          <button className={listFilter === "bets" ? "active" : ""} onClick={() => setListFilter("bets")}>My Bets <b>{myBets.length}</b></button>
         </div>
-        <div className="kn-row-right"><span className="kn-green">{t.stake}</span></div>
-      </div>
-    ));
+        {list.length === 0 && <p className="kn-muted kn-pad">No tickets yet.</p>}
+        {list.map((t) => (
+          <TicketCard
+            key={t.id}
+            t={t}
+            mine={myIds.has(t.id)}
+            drawn={t.drawId === listDrawId ? drawn : null}
+            done={t.drawId === listDrawId ? done : false}
+          />
+        ))}
+      </section>
+    );
+  };
 
   // ---------- render ----------
   return (
@@ -391,39 +433,26 @@ const FastKeno = () => {
         {/* ================= FOCUS VIEW: draw in progress ================= */}
         {focus ? (
           <>
-            <section className="kn-card kn-called">
-              <div className="kn-called-grid">
-                {Array.from({ length: 20 }, (_, i) => {
-                  const n = called[i];
-                  const isLatest = n !== undefined && n === latest && phase === "drawing";
-                  const mine = n !== undefined && focusTickets.some((t) => (t.picks || []).includes(n));
-                  return (
-                    <span
-                      key={i}
-                      className={`kn-slot ${n === undefined ? "empty" : n > 40 ? "tail" : "head"} ${mine ? "mine" : ""} ${isLatest ? "latest" : ""}`}
-                    >
-                      {n ?? ""}
-                    </span>
-                  );
-                })}
-              </div>
+            <section className={`kd-stage ${phase}`}>
+              <div className="kd-rings"><i /><i /><i /><i /></div>
+              <div className="kd-count">{pad2(called.length)}<em>/</em>20</div>
+              {phase === "drawing" ? (
+                <>
+                  <div className="kd-row">
+                    {called.slice(0, -1).slice(-6).map((n) => (
+                      <span key={n} className="kd-ball">{n}</span>
+                    ))}
+                  </div>
+                  {latest !== undefined && <div key={latest} className="kd-big">{latest}</div>}
+                </>
+              ) : (
+                <div className="kd-all">
+                  {called.map((n) => <span key={n} className="kd-ball sm">{n}</span>)}
+                </div>
+              )}
             </section>
 
-            {focusTickets.length > 0 && (
-              <section className="kn-focus-mine">
-                {focusTickets.map((t) => (
-                  <Ticket key={t._id} t={t} drawn={calledSet} done={drawDone} showWin={drawDone} />
-                ))}
-              </section>
-            )}
-
-            <section className="kn-list">
-              <div className="kn-list-head">
-                <span>Players</span>
-                <span className="kn-live"><i /> {live.players}</span>
-              </div>
-              <PlayerRows list={live.list} drawn={calledSet} done={drawDone} />
-            </section>
+            <TicketBoard drawn={calledSet} done={drawDone} />
           </>
         ) : (
           /* ================= NORMAL VIEW ================= */
@@ -466,13 +495,6 @@ const FastKeno = () => {
                         <span key={n} className={`kn-ball ${n > 40 ? "tail" : ""}`}>{n}</span>
                       ))}
                     </div>
-                    {myLastTickets.length > 0 && (
-                      <div className="kn-mt12">
-                        {myLastTickets.map((t) => (
-                          <Ticket key={t._id} t={t} drawn={lastSet} done showWin />
-                        ))}
-                      </div>
-                    )}
                   </section>
                 )}
 
@@ -511,21 +533,6 @@ const FastKeno = () => {
                         </button>
                       ))}
                     </div>
-                  </section>
-                )}
-
-                {openTickets.length > 0 && (
-                  <section className="kn-card">
-                    <div className="kn-card-head">
-                      <span>My tickets</span>
-                      <span className="kn-muted">{openTickets.length} waiting</span>
-                    </div>
-                    {openTickets.map((t) => (
-                      <div key={t._id}>
-                        <div className="kn-muted kn-ticket-game">Game #{t.drawId}</div>
-                        <Ticket t={t} />
-                      </div>
-                    ))}
                   </section>
                 )}
 
@@ -598,14 +605,7 @@ const FastKeno = () => {
                   )}
                 </section>
 
-                <section className="kn-list">
-                  <div className="kn-list-head">
-                    <span>Players in game #{live.drawId ?? "—"}</span>
-                    <span className="kn-live"><i /> LIVE · {live.players} player{live.players === 1 ? "" : "s"}</span>
-                  </div>
-                  {live.list.length === 0 && <p className="kn-muted kn-pad">No tickets yet. Be the first!</p>}
-                  <PlayerRows list={live.list} />
-                </section>
+                <TicketBoard drawn={null} done={false} />
 
                 <p className="kn-fine">
                   20 of 80 numbers are drawn at random, one per second. Prizes come from fixed tables, so everyone has the

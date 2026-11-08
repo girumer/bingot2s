@@ -149,14 +149,11 @@ function drawSummary(numbers) {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
-// Name shown to other players. Phone-number usernames are partly hidden.
+// Name shown to other players: first and last character only, e.g. "9***6".
 function displayName(username) {
-  const name = String(username || "Player").trim();
-  const digits = name.replace(/\D/g, "");
-  if (digits.length >= 7 && digits.length >= name.replace(/[\s+\-()]/g, "").length - 1) {
-    return `${name.slice(0, 4)}****${name.slice(-2)}`;
-  }
-  return name.length > 18 ? `${name.slice(0, 17)}…` : name;
+  const chars = Array.from(String(username || "player").trim());
+  if (chars.length <= 2) return `${chars[0] || "?"}***`;
+  return `${chars[0]}***${chars[chars.length - 1]}`;
 }
 
 // Score one ticket against a draw.

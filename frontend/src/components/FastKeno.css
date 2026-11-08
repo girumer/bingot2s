@@ -489,3 +489,169 @@
 .kn-ticket.won { border-color: var(--green); background: #17291f; box-shadow: 0 0 16px rgba(46, 204, 113, 0.35); }
 .kn-win { color: var(--green); font-weight: 900; font-size: 18px; }
 .kn-ticket-game { margin: 4px 0; }
+
+/* ================= draw stage (like the reference picture) ================= */
+.kd-stage {
+  position: relative;
+  height: 250px;
+  margin: 0 -14px 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 60% 42%, rgba(26, 140, 110, 0.55) 0%, rgba(14, 70, 60, 0.35) 22%, rgba(10, 30, 32, 0) 55%),
+    linear-gradient(180deg, #0d1b1e 0%, #0a1416 100%);
+}
+.kd-stage.checking { height: auto; min-height: 200px; padding: 46px 12px 16px; }
+.kd-rings i {
+  position: absolute;
+  left: 60%;
+  top: 42%;
+  border-radius: 50%;
+  border: 3px solid rgba(64, 200, 160, 0.16);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  transform: translate(-50%, -50%);
+  animation: kd-spin 9s linear infinite;
+}
+.kd-rings i:nth-child(1) { width: 130px; height: 130px; border-style: dashed; animation-duration: 6s; }
+.kd-rings i:nth-child(2) { width: 220px; height: 220px; animation-duration: 11s; animation-direction: reverse; }
+.kd-rings i:nth-child(3) { width: 320px; height: 320px; border-style: dashed; animation-duration: 15s; }
+.kd-rings i:nth-child(4) { width: 440px; height: 440px; animation-duration: 21s; animation-direction: reverse; }
+@keyframes kd-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+.kd-count {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 3;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #e9f6f1;
+  font-variant-numeric: tabular-nums;
+}
+.kd-count em { font-style: normal; color: var(--green); margin: 0 6px; }
+
+/* glossy ball */
+.kd-ball, .kd-big {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+  background: radial-gradient(circle at 50% 26%, #7f9fb0 0%, #34566a 20%, #142a37 52%, #08131b 100%);
+  border: 2px solid rgba(160, 200, 220, 0.55);
+  box-shadow:
+    inset 0 -8px 14px rgba(0, 0, 0, 0.55),
+    inset 0 5px 10px rgba(255, 255, 255, 0.18),
+    0 6px 14px rgba(0, 0, 0, 0.55);
+}
+.kd-ball { width: 48px; height: 48px; font-size: 20px; flex: none; animation: kd-slide 0.5s ease-out; }
+.kd-ball.sm { width: 40px; height: 40px; font-size: 16px; animation: none; }
+.kd-big {
+  position: absolute;
+  z-index: 2;
+  left: 60%;
+  top: 42%;
+  width: 104px;
+  height: 104px;
+  margin: -52px 0 0 -52px;
+  font-size: 46px;
+  animation: kd-drop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.kd-row {
+  position: absolute;
+  z-index: 1;
+  left: 10px;
+  right: 40%;
+  top: calc(42% + 28px);
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow: hidden;
+  padding-right: 6px;
+}
+.kd-all {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 40px);
+  justify-content: center;
+  gap: 8px 10px;
+}
+@keyframes kd-drop {
+  0% { transform: translateY(-160px) scale(0.6); opacity: 0; }
+  60% { transform: translateY(8px) scale(1.06); opacity: 1; }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes kd-slide {
+  from { transform: translateX(40px) scale(0.8); opacity: 0.3; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+/* ================= ticket cards (like the reference picture) ================= */
+.kt-board { margin: 0 -14px 12px; padding: 0 10px; }
+.kt-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 -10px 10px;
+  padding: 10px 6px;
+  background: var(--panel);
+}
+.kt-tabs button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.kt-tabs button b { color: var(--green); margin-left: 6px; font-weight: 800; }
+.kt-tabs button.active { color: var(--text); box-shadow: inset 0 -2px 0 var(--green); }
+
+.kt-card {
+  background: #2a2f35;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 10px;
+  font-family: "Roboto Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+}
+.kt-card.mine { border-color: rgba(46, 204, 113, 0.6); }
+.kt-card.won { border-color: var(--green); box-shadow: 0 0 14px rgba(46, 204, 113, 0.35); }
+.kt-id { color: #3ddc84; font-weight: 800; font-size: 18px; margin: 0 2px 6px; display: flex; align-items: center; gap: 8px; }
+.kt-you { font-size: 11px; color: #0b1a12; background: var(--green); border-radius: 4px; padding: 1px 6px; }
+.kt-slots { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-bottom: 6px; }
+.kt-slot {
+  aspect-ratio: 1 / 0.95;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  font-size: clamp(15px, 4.6vw, 20px);
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.kt-slot.empty { background: #21262b; }
+.kt-slot.filled { background: #3b434a; }
+.kt-slot.hit { background: var(--gold); color: #1b1600; box-shadow: 0 0 10px rgba(237, 194, 26, 0.55); animation: kt-hit 0.45s ease-out; }
+.kt-slot.miss { background: #3a2529; color: #ff8a8a; text-decoration: line-through; }
+.kt-slot.wide { grid-column: span 10; aspect-ratio: auto; padding: 10px 0; font-size: 17px; letter-spacing: 0.04em; }
+@keyframes kt-hit { 0% { transform: scale(1); } 45% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.kt-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.kt-bet, .kt-status {
+  background: #21262b;
+  border-radius: 4px;
+  padding: 7px 10px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.kt-bet { color: #e9ecef; }
+.kt-status { text-align: right; }
+.kt-status.waiting { color: #f5d90a; }
+.kt-status.playing { color: var(--blue); }
+.kt-status.won { color: var(--green); }
+.kt-status.lost { color: #8b93a7; }
