@@ -3,6 +3,7 @@ const router = express.Router();
 const BingoBord = require("../Models/BingoBord");
 const Transaction = require('../Models/Transaction');
 const Counter=require('../Models/CounterSchema');
+const { verifyAdmin } = require('../middleware/adminMiddleware');
 // Deposit
 
 
@@ -100,7 +101,7 @@ router.get("/history/:username", async (req, res) => {
   }
 });
 // Get all users' transactions (for admin dashboard)
-router.get("/all", async (req, res) => {
+router.get("/all", verifyAdmin, async (req, res) => {
   try {
     const users = await BingoBord.find({}, "username transactions");
     const allTransactions = users.map(u => ({
@@ -114,7 +115,7 @@ router.get("/all", async (req, res) => {
   }
 });
 // Get paginated list of users (Admin only)
-router.get("/admin-api/users", async (req, res) => {
+router.get("/admin-api/users", verifyAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
