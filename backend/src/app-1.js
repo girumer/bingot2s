@@ -1692,11 +1692,9 @@ app.post('/update-wallet', (req, res) => {
   console.warn(`[SECURITY] Blocked /update-wallet request from ${req.ip}`);
   res.status(410).json({ error: "Not available" });
 });
-app.get("/dashboard", verfyuser, async (req, res) => {
-  console.log("Dashboard route hit");
+app.get("/dashboard", verifyAdminRoute, async (req, res) => {
   try {
-    const user = await BingoBord.find({});
-    console.log("All users are:", user);
+    const user = await BingoBord.find({}).select("-password");
     return res.json({ valid: true, user: user });
   } catch (error) {
     console.error("Error:", error);

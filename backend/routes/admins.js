@@ -2,10 +2,13 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const BingoBord = require("../Models/BingoBord");
 
+const { verifyAdmin } = require("../middleware/adminMiddleware");
+
 const router = express.Router();
 
 // Register admin
-router.post("/register-admin", async (req, res) => {
+// Only a logged-in admin may create another admin.
+router.post("/register-admin", verifyAdmin, async (req, res) => {
   try {
     const { username, phoneNumber, password } = req.body;
 
@@ -23,6 +26,7 @@ router.post("/register-admin", async (req, res) => {
       phoneNumber,
       password,
       role: "admin",
+      Wallet: 0,
     });
 
     await admin.save();
