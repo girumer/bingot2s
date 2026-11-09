@@ -1710,6 +1710,9 @@ app.get("/dashboard", verifyAdminRoute, async (req, res) => {
     
 }) */
 app.post("/updateplayer", async (req, res) => { 
+  // Old leftover route: nothing uses it, and it let anyone change any wallet.
+  return res.status(410).json({ error: "This route is no longer available." });
+  // eslint-disable-next-line no-unreachable
   const { username,stake,numberofplayer,profit,awardforagent,totalcash,venderaward,winerAward,percent } = req.body;
 
   const data = {
