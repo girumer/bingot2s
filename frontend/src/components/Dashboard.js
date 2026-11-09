@@ -9,6 +9,9 @@ import Navbaradmin from './Navbaradmin';
 
 
 
+// These two actions need the admin login (from the admin login page).
+const adminHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("admintoken")}` });
+
 function Dashbord() {
 //const [message,setMessage]=setMessage('');
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -38,7 +41,7 @@ const [message, setMessage] = useState('');
 };
 const performaction=()=>{
   setShowDialog(false);
-  axios.post(`${BACKEND_URL}/updatewallete`,{tempuser,incaamount})
+  axios.post(`${BACKEND_URL}/updatewallete`,{tempuser,incaamount},{ headers: adminHeader() })
     .then(res=>{
       alert(res.data); // Display success message
            
@@ -56,7 +59,7 @@ const performaction=()=>{
   }
   const handleDeleteIconClick = (username) => {
     //console.log('Delete icon clicked for user:', user);
-   axios.post(`${BACKEND_URL}/deleteuser`,{username})
+   axios.post(`${BACKEND_URL}/deleteuser`,{username},{ headers: adminHeader() })
     .then(res=>{
       alert(res.data.message); // Display success message
             setMessage("User deleted successfully!");

@@ -1475,7 +1475,10 @@ app.use("/api", transactionRoutesd);
 app.use('/admin', adminRoutes);
 
 app.use('/auth', authRouter);
-app.post("/deleteuser",async(req,res)=>{
+// Only a logged-in admin (password admin login) may delete players or change wallets.
+const { verifyAdmin: verifyAdminRoute } = require("../middleware/adminMiddleware");
+
+app.post("/deleteuser", verifyAdminRoute, async(req,res)=>{
     const{username}=req.body
   
     
@@ -1498,47 +1501,28 @@ app.post("/deleteuser",async(req,res)=>{
     }
   
   })
-  app.post("/updatewallete", async (req, res) => { 
-    const {tempuser,incaamount} = req.body;
-  
-    
+  app.post("/updatewallete", verifyAdminRoute, async (req, res) => {
+    const { tempuser } = req.body;
+    const amount = Number(req.body.incaamount);
+    if (!tempuser || !Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 100000) {
+      return res.status(400).json({ message: "Invalid user or amount" });
+    }
     try {
-        // Find if the player already exists
-        const check = await BingoBord.findOne({ username: tempuser });
-        console.log("user is ",check);
-          
-        if (check) {
-         // Retrieve the last gameId from gameHistory if it exists, otherwise start from 0
-             // Increment gameId
-            
-            const filter = { username:  tempuser };
-            const update = {
-                $inc: { Wallet: incaamount}// Deduct from Wallet
-               
-                
-                } // Push new game history entry
-           
-  
-            const result = await BingoBord.updateOne(filter, update);
-            if (result.matchedCount === 0) {
-                console.log("No documents matched the filter.");
-            } else if (result.modifiedCount === 0) {
-                console.log("Document was found, but no updates were made.");
-            } else {
-                console.log("Document updated successfully.");
-            }
-            return res.json("updated");
-          }// Send response after successful update
-        else {
-            // If player does not exist, insert data and respond
-            await BingoBord.insertMany([data]); // Ensure collection is defined correctly here
-            return res.json("notexist");
-        }
+      // Atomic: a deduction only happens if the balance covers it (never below 0).
+      const user = await BingoBord.findOneAndUpdate(
+        { username: tempuser, ...(amount < 0 ? { Wallet: { $gte: -amount } } : {}) },
+        { $inc: { Wallet: amount } },
+        { new: true }
+      );
+      if (!user) {
+        const exists = await BingoBord.exists({ username: tempuser });
+        return res.json(exists ? "insufficient balance" : "notexist");
+      }
+      console.log(`[ADMIN] Wallet of ${tempuser} changed by ${amount} → ${user.Wallet} (from ${req.ip})`);
+      return res.json("updated");
     } catch (e) {
-        console.error("Database error:", e); // Log the error
-        if (!res.headersSent) { // Ensure response is sent only once
-            res.json("fail");
-        }
+      console.error("Database error:", e);
+      if (!res.headersSent) res.json("fail");
     }
   });
 
@@ -1703,22 +1687,10 @@ app.post("/depositcheckB", async (req, res) => {
   }
   res.json({ wallet: user.Wallet });
 });
-app.post('/update-wallet', async (req, res) => {
-  const { initData, amount } = req.body;   // ✅ read initData, not telegramId
-  if (!initData) return res.status(401).json({ error: "Missing authentication" });
-  const verified = verifyTelegramInitData(initData, process.env.BOT_TOKEN);
-  if (!verified) return res.status(403).json({ error: "Invalid" });
-  const userData = JSON.parse(verified.user);
-  const telegramId = userData.id;   // ✅ REAL user
-
-  const user = await BingoBord.findOne({ telegramId });
-  if (!user) return res.status(404).json({ error: "User not found" });
-  if (user.Wallet + amount < 0) {
-    return res.status(402).json({ error: "Insufficient funds" });
-  }
-  user.Wallet += amount;
-  await user.save();
-  res.json({ wallet: user.Wallet });
+// REMOVED: this let a player add any amount to their own wallet. Nothing uses it.
+app.post('/update-wallet', (req, res) => {
+  console.warn(`[SECURITY] Blocked /update-wallet request from ${req.ip}`);
+  res.status(410).json({ error: "Not available" });
 });
 app.get("/dashboard", verfyuser, async (req, res) => {
   console.log("Dashboard route hit");
@@ -1811,6 +1783,9 @@ let depo1 = (check.gameHistory.length > 0)
   }
 });
 app.post("/api/spin", async (req, res) => {
+  // Spin & Win has been removed: refuse before any money is taken.
+  return res.status(410).json({ error: "Spin & Win is no longer available." });
+  // eslint-disable-next-line no-unreachable
   const { initData, stake } = req.body;
   if (!initData) return res.status(401).json({ error: "Missing authentication" });
   const verified = verifyTelegramInitData(initData, process.env.BOT_TOKEN);
@@ -1869,7 +1844,8 @@ app.post("/gameid",async(req,res)=>{
 })
 // ================= FAST KENO =================
 const { setupKeno } = require("./keno");
-setupKeno({ app, io, BingoBord, verifyTelegramInitData });
+const { verifyAdmin: verifyKenoAdmin } = require("../middleware/adminMiddleware");
+setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin: verifyKenoAdmin });
 
 const port = process.env.PORT || 3001;
 
