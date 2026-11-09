@@ -136,7 +136,7 @@ const mainMenu = {
       [
        
         { text: "🎮 Play Bingo", callback_data: "play" },
-        { text: "🎰 Spin & Win", callback_data: "spin_game" },
+        { text: "🎱 Fast Keno", callback_data: "keno" },
       ],
       [ 
          { text: "💰 Balance", callback_data: "balance" },
@@ -156,12 +156,6 @@ const mainMenu = {
    { text: "🏆 Leaders board", callback_data: "top" },
           { text: "🪙 Convert Coins", callback_data: "transfer_coins_to_wallet" }, // <-- NEW BUTTON
       ],
-      [
-        { text: "⚽ Fantasy Premier League", callback_data: "fpl" },  // ← NEW ROW
-      ],
-      [
-        { text: "🎱 Fast Keno", callback_data: "keno" },
-      ]
     ]
   }
 };
@@ -904,17 +898,10 @@ bot.on('callback_query', async (callbackQuery) => {
   
   break;
  case "spin_game":
-  // ✅ Acknowledge the button click
-  bot.sendMessage(chatId, "Select your bet amount for Spin & Win:", {
-    reply_markup: {
-   inline_keyboard: [
-  [
-    { text: "Spin 5 ETB", callback_data: "spin_5" },
-  ]
-]
-
-    }
-  });
+ case "spin_5":
+ case "fpl":
+  // Spin & Win and Fantasy Premier League have been removed.
+  answerQuery("This game is no longer available.", true);
   break;
     case "gameHistory":
       if (!user.gameHistory || user.gameHistory.length === 0) {
@@ -1063,35 +1050,6 @@ New balances:
       }
       break;
 
- case "spin_5":
-
-  bot.answerCallbackQuery(callbackQuery.id); // ✅ Acknowledge the button click
-
-  const spinStake = Number(data.split("_")[1]);
-  
-  // REMOVE THIS DUPLICATE LINE: const user = await BingoBord.findOne({ telegramId: chatId });
-  // User is already fetched at the beginning of the callback handler
-
-  if (!user) {
-    bot.sendMessage(chatId, "❌ You are not registered. Use /start to begin.");
-    return;
-  }
-
-  if (user.Wallet < spinStake) {
-    bot.sendMessage(chatId, `❌ You don't have enough balance. Your wallet: ${user.Wallet} ETB`);
-    return;
-  }
-
-const spinnerUrl = `${process.env.FRONTEND_URL}/SpinnerSelection?stake=${spinStake}`;
-
-  bot.sendMessage(chatId, `🎯 Ready to spin for ${spinStake} ETB! Click below to continue:`, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "🎰 Launch Spinner", web_app: { url: spinnerUrl } }]
-      ]
-    }
-  });
-  break;
 
     // Alternative: If you want to automatically open the web app without a button
   // Note: This requires the user to have interacted with the bot first
@@ -1180,23 +1138,6 @@ case "referral":
     answerQuery("", false);
     break;
   }
-        case "fpl":
-    const fplUrl = `${process.env.FRONTEND_URL}/FplDashboard`;
-
-    bot.sendMessage(chatId, `⚽ <i>Fantasy Premier League</i>\n\nTrack your FPL team, compare with friends, and climb the ranks!`, {
-        parse_mode: "HTML",
-        reply_markup: {
-            inline_keyboard: [
-                [{
-                    text: "🏆 Open FPL Dashboard",
-                    web_app: { url: fplUrl }
-                }]
-            ]
-        }
-    });
-
-    answerQuery("", false);   // acknowledge the button tap
-    break;
     
     default:
       bot.sendMessage(chatId, "Unknown action occured.");

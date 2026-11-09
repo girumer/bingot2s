@@ -1811,6 +1811,9 @@ let depo1 = (check.gameHistory.length > 0)
   }
 });
 app.post("/api/spin", async (req, res) => {
+  // Spin & Win has been removed: refuse before any money is taken.
+  return res.status(410).json({ error: "Spin & Win is no longer available." });
+  // eslint-disable-next-line no-unreachable
   const { initData, stake } = req.body;
   if (!initData) return res.status(401).json({ error: "Missing authentication" });
   const verified = verifyTelegramInitData(initData, process.env.BOT_TOKEN);

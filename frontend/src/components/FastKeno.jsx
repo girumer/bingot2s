@@ -260,10 +260,6 @@ const FastKeno = () => {
   const lastResult = results[0];
   const lastSet = useMemo(() => new Set(lastResult?.numbers || []), [lastResult]);
 
-  const progress =
-    phase === "betting" ? Math.min(100, Math.max(0, 100 - ((round.drawAt - serverNow) / joinMs) * 100))
-    : phase === "drawing" ? (called.length / 20) * 100
-    : phase === "checking" ? 100 : 0;
 
   const statusText =
     phase === "waiting" ? "Waiting for players"
@@ -418,13 +414,15 @@ const FastKeno = () => {
               <span className="kn-logo-keno">KENO<i /></span>
             </div>
             <div className="kn-sub">
-              Game #{(focus ? round.draw?.drawId : round.drawId) ?? "—"} ·{" "}
-              <span className={`kn-status ${phase}`}>{statusText}</span>
+              Game #{(focus ? round.draw?.drawId : round.drawId) ?? "—"}
+              {phase !== "betting" && <> · <span className={`kn-status ${phase}`}>{statusText}</span></>}
             </div>
+          </div>
+          <div className={`kn-timer ${phase} ${phase === "betting" && secondsLeft <= 10 ? "low" : ""}`}>
+            {phase === "betting" ? `00:${pad2(secondsLeft)}` : "00:00"}
           </div>
           <div className="kn-wallet">{wallet === null ? "—" : wallet.toFixed(2)} ETB</div>
         </div>
-        <div className="kn-bar"><div className={`kn-bar-fill ${phase}`} style={{ width: `${progress}%` }} /></div>
 
         {/* ================= FOCUS VIEW: draw in progress ================= */}
         {focus ? (
