@@ -14,7 +14,7 @@ const registerUser = async (req, res) => {
     const newUser = new BingoBord({
       username,
       phoneNumber,
-      Wallet: 0,
+     
     });
 
     await newUser.save();

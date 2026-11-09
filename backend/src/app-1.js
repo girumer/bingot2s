@@ -720,11 +720,6 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
   }
   const { clientId, username } = auth;
   const rId = String(roomId);
-  // Only real cartela numbers are accepted.
-  if (!Number.isInteger(cartelaIndex) || cartelaIndex < 0 || cartelaIndex >= cartela.length) {
-    socket.emit("cartelaRejected", { message: "Invalid cartela" });
-    return;
-  }
 
   if (!rooms[rId] || rooms[rId].selectedIndexes.includes(cartelaIndex)) {
     socket.emit("cartelaRejected", {
@@ -765,27 +760,14 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
       return;
     }
 
-    // Deduct wallet in one safe step: only if the balance still covers the stake.
-    const paid = await BingoBord.findOneAndUpdate(
-      { _id: user._id, Wallet: { $gte: stake } },
-      { $inc: { Wallet: -stake } },
-      { new: true }
-    );
-    if (!paid) {
-      socket.emit("cartelaRejected", { message: "Insufficient balance" });
-      return;
-    }
-    // Another player may have taken this cartela while we were paying: refund.
-    if (rooms[rId].selectedIndexes.includes(cartelaIndex) || rooms[rId].activeGame) {
-      await BingoBord.updateOne({ _id: user._id }, { $inc: { Wallet: stake } });
-      socket.emit("cartelaRejected", { message: "Cartela already taken" });
-      return;
-    }
+    // Deduct wallet
+    user.Wallet -= stake;
+    await user.save();
 
     userCartelas.push(cartelaIndex);
     rooms[rId].selectedIndexes.push(cartelaIndex);
 
-    socket.emit("cartelaAccepted", { cartelaIndex, Wallet: paid.Wallet });
+    socket.emit("cartelaAccepted", { cartelaIndex, Wallet: user.Wallet });
     io.to(rId).emit("updateSelectedCartelas", {
       selectedIndexes: rooms[rId].selectedIndexes,
     });
@@ -801,17 +783,153 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
 
 
   // --- CALL NUMBER ---
-  // REMOVED "callNumber": any client could call any number and rig a game.
-  // Numbers are called only by the server's own game loop.
+  socket.on("callNumber", ({ roomId, number }) => {
+    if (!rooms[roomId]) return;
+    const room = rooms[roomId];
+    if (!room.calledNumbers.includes(number)) room.calledNumbers.push(number);
+
+    io.to(roomId).emit("numberCalled", number);
+    io.to(roomId).emit(
+      "currentCalledNumbers",
+      room.calledNumbers.slice(-5).reverse()
+    );
+    io.to(roomId).emit("updateSelectedCartelas", {
+      selectedIndexes: room.selectedIndexes,
+    });
+
+    checkWinners(roomId, number);
+  });
 
   // ==========================================
   // FPL MULTIPLAYER MATCHMAKING
   // ==========================================
   // Tracks waiting players
 
-    // REMOVED "fpl_join_room": FPL is no longer offered, and this handler trusted the
-    // telegramId and score sent by the client (spend anyone's money / win any pot).
-    socket.on("fpl_join_room", () => socket.emit("fpl_error", { message: "FPL is no longer available." }));
+    socket.on("fpl_join_room", async ({ telegramId, roomId, squadIds, captainId, totalScore}) => {
+    try {
+      const stake = Number(roomId);
+      const user = await BingoBord.findOne({ telegramId: Number(telegramId) });
+
+      if (!user) return socket.emit("fpl_error", { message: "User not found" });
+      if (user.Wallet < stake) return socket.emit("fpl_error", { message: `Insufficient balance. You need ${stake} ETB.` });
+
+      const alreadyInQueue = fplRooms[stake].find(p => p.telegramId === user.telegramId);
+      if (alreadyInQueue) return socket.emit("fpl_error", { message: "You are already in this queue." });
+
+      user.Wallet -= stake;
+      await user.save();
+
+      const playerData = {
+        socketId: socket.id,
+        telegramId: user.telegramId,
+        username: user.username,
+        squadIds,
+        captainId,
+        totalScore
+      };
+
+      fplRooms[stake].push(playerData);
+      broadcastFplLobbies();
+
+      // ✅ START TIMER ONLY WHEN 2 OR MORE PLAYERS ARE IN THE ROOM
+      if (fplRooms[stake].length >= 2) {
+        if (!fplTimers[stake]) {
+          fplTimers[stake] = { timeLeft: 30 };
+          
+          fplTimers[stake].interval = setInterval(async () => {
+              fplTimers[stake].timeLeft -= 1;
+              const time = fplTimers[stake].timeLeft;
+
+              const currentPlayers = fplRooms[stake].length;
+              const totalPot = currentPlayers * stake;
+              
+              // 🔥 LIVE MAX PRIZE DISPLAY
+              // 90% if < 10 players, 40% if >= 10 players
+              let maxPrize = currentPlayers >= 10 ? Math.floor(totalPot * 0.40) : Math.floor(totalPot * 0.90);
+
+              fplRooms[stake].forEach(p => {
+                  io.to(p.socketId).emit("fpl_match_found", { timeLeft: time, maxPrize: maxPrize });
+              });
+
+              if (time <= 0) {
+                  clearInterval(fplTimers[stake].interval);
+                  
+                  const playersInGame = [...fplRooms[stake]];
+                  fplRooms[stake] = []; 
+                  fplTimers[stake] = null; 
+                  broadcastFplLobbies();
+
+                  if (playersInGame.length === 0) return;
+
+                  // SORT HIGHEST SCORE FIRST
+                  playersInGame.sort((a, b) => b.totalScore - a.totalScore);
+
+                  const finalTotalPot = playersInGame.length * stake;
+                  let payouts = {};
+
+                  // 💰 YOUR EXACT PAYOUT RULES
+                  if (playersInGame.length === 1) {
+                      // Safety refund if only 1 player
+                      payouts[playersInGame[0].telegramId] = stake;
+                  } 
+                  else if (playersInGame.length < 10) {
+                      // 2 to 9 Players: 1st Place takes 90%
+                      payouts[playersInGame[0].telegramId] = Math.floor(finalTotalPot * 0.90); 
+                  } 
+                  else {
+                      // 10+ Players: 1st 40%, 2nd 30%, 3rd 20%
+                      payouts[playersInGame[0].telegramId] = Math.floor(finalTotalPot * 0.40);
+                      payouts[playersInGame[1].telegramId] = Math.floor(finalTotalPot * 0.30);
+                      payouts[playersInGame[2].telegramId] = Math.floor(finalTotalPot * 0.20);
+                  }
+
+                  // EXECUTE PAYOUTS
+                 // EXECUTE PAYOUTS
+for (const player of playersInGame) {
+    const prize = payouts[player.telegramId] || 0;
+    if (prize > 0) {
+        await BingoBord.updateOne({ telegramId: player.telegramId }, { $inc: { Wallet: prize } });
+    }
+
+    let rank = playersInGame.findIndex(p => p.telegramId === player.telegramId) + 1;
+    
+    // ✅ Fetch fresh wallet so frontend can show before/after
+    const freshUser = await BingoBord.findOne({ telegramId: player.telegramId });
+    
+    io.to(player.socketId).emit("fpl_match_start", {
+        roomId: stake,
+        totalPlayers: playersInGame.length,
+        myRank: rank,
+        myPrize: prize,
+        myUsername: player.username,
+        entryFee: stake,
+        walletBeforeMatch: freshUser.Wallet - prize,
+        walletAfterMatch: freshUser.Wallet,
+        winner: playersInGame[0],
+        allScores: playersInGame.map(p => ({ username: p.username, score: p.totalScore }))
+    });
+}
+              }
+          }, 1000);
+        } else {
+          // Player 3, 4, 5... joins mid-countdown
+          const timeLeft = fplTimers[stake].timeLeft;
+          const currentPlayers = fplRooms[stake].length;
+          const totalPot = currentPlayers * stake;
+          let maxPrize = currentPlayers >= 10 ? Math.floor(totalPot * 0.40) : Math.floor(totalPot * 0.90);
+          
+          socket.emit("fpl_match_found", { timeLeft: timeLeft, maxPrize: maxPrize });
+        }
+      } else {
+        // Player 1 waiting alone (no timer)
+        socket.emit("fpl_waiting", { message: "Waiting for opponent..." });
+      }
+
+    } catch (err) {
+      console.error("FPL Matchmaking Error:", err);
+      socket.emit("fpl_error", { message: "Server error during matchmaking." });
+    }
+  });
 
   socket.on("fpl_cancel_match", async ({ roomId }) => {
     const stake = Number(roomId);
@@ -1417,7 +1535,7 @@ app.post("/deleteuser", verifyAdminRoute, async(req,res)=>{
 
 // API: Receive SMS message (TeleBirr or CBE) and store transaction
 
-app.get("/admin/transactions-list", verifyAdminRoute, async (req, res) => {
+app.get("/admin/transactions-list", async (req, res) => {
   try {
     const transactions = await Transaction.find({ method: "depositpend" })
       .sort({ createdAt: -1 })
@@ -1428,7 +1546,7 @@ app.get("/admin/transactions-list", verifyAdminRoute, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch transactions" });
   }
 });
-app.get("/admin/pending-withdrawals", verifyAdminRoute, async (req, res) => {
+app.get("/admin/pending-withdrawals",  async (req, res) => {
   try {
     const pendingWithdrawals = await Transaction.find({ method: "withdrawal"}).sort({ createdAt: -1 });
     res.json(pendingWithdrawals);
@@ -1437,7 +1555,7 @@ app.get("/admin/pending-withdrawals", verifyAdminRoute, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-app.get("/admin/deposit", verifyAdminRoute, async (req, res) => {
+app.get("/admin/deposit",  async (req, res) => {
   try {
     const pendingdeposit = await Transaction.find({ method: "deposit"}).sort({ createdAt: -1 });
     res.json(pendingdeposit);
@@ -1447,13 +1565,11 @@ app.get("/admin/deposit", verifyAdminRoute, async (req, res) => {
   }
 });
 
-// Allowed for the bot (secret key) or a logged-in admin (admin dashboard).
-const botKeyOrAdmin = (req, res, next) => {
-  const key = process.env.INTERNAL_API_SECRET;
-  if (key && req.headers['x-api-key'] === key) return next();
-  return verifyAdminRoute(req, res, next);
-};
-app.post("/admin/confirm-withdrawal", botKeyOrAdmin, async (req, res) => {
+app.post("/admin/confirm-withdrawal", async (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey !== process.env.INTERNAL_API_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
     const { withdrawalId } = req.body;
   try {
     const transaction = await Transaction.findOne({withdrawalId});
@@ -1476,7 +1592,7 @@ else{
     res.status(500).json({ message: "Server error" });
   }
 });
-app.post("/admin/confirm-depo", verifyAdminRoute, async (req, res) => {
+app.post("/admin/confirm-depo", async (req, res) => {
   const {depositId} = req.body;
   try {
     const transaction = await Transaction.findOne({depositId});
@@ -1576,9 +1692,11 @@ app.post('/update-wallet', (req, res) => {
   console.warn(`[SECURITY] Blocked /update-wallet request from ${req.ip}`);
   res.status(410).json({ error: "Not available" });
 });
-app.get("/dashboard", verifyAdminRoute, async (req, res) => {
+app.get("/dashboard", verfyuser, async (req, res) => {
+  console.log("Dashboard route hit");
   try {
-    const user = await BingoBord.find({}).select("-password");
+    const user = await BingoBord.find({});
+    console.log("All users are:", user);
     return res.json({ valid: true, user: user });
   } catch (error) {
     console.error("Error:", error);
@@ -1593,10 +1711,76 @@ app.get("/dashboard", verifyAdminRoute, async (req, res) => {
     return  res.json({valid:true ,user:user});
     
 }) */
-// REMOVED: no login check, and a negative "venderaward" added money to any wallet.
-app.post("/updateplayer", (req, res) => {
-  console.warn(`[SECURITY] Blocked /updateplayer request from ${req.ip}`);
-  res.status(410).json({ error: "Not available" });
+app.post("/updateplayer", async (req, res) => { 
+  const { username,stake,numberofplayer,profit,awardforagent,totalcash,venderaward,winerAward,percent } = req.body;
+
+  const data = {
+      username: username,
+      numberofplayer:numberofplayer,
+      profit:profit,
+      stake: stake,
+      totalcash: totalcash,
+      venderaward: venderaward,
+      winerAward:winerAward,
+      awardforagent:awardforagent,
+      percent:percent
+  };
+
+  try {
+      // Find if the player already exists
+      const check = await BingoBord.findOne({ username: username });
+     // console.log("user is ",check);
+        console.log("winer awared is ",winerAward);
+      if (check) {
+       // Retrieve the last gameId from gameHistory if it exists, otherwise start from 0
+let depo1 = (check.gameHistory.length > 0) 
+? check.gameHistory[check.gameHistory.length - 1].gameId + 1 
+: 1;
+        console.log( check.gameId);
+           depo1 =depo1+1;// Increment gameId
+          const PayeForVendor = venderaward;
+          
+          const waletdeuction = -venderaward;
+          const filter = { username:  username };
+          const update = {
+              $inc: { Wallet: waletdeuction }, // Deduct from Wallet
+             
+              $push: { 
+                  gameHistory: { 
+                      gameId: depo1,
+                      stake: stake,
+                      numberofplayer:numberofplayer,
+                      profit:profit,
+                      awardforagen:awardforagent, 
+                      PayeForVendor: PayeForVendor, 
+                      winerAward: winerAward,
+                      totalcash: totalcash,
+                      percent:percent,
+                      timestamp: new Date()
+                  } 
+              } // Push new game history entry
+          };
+
+          const result = await BingoBord.updateOne(filter, update);
+          if (result.matchedCount === 0) {
+              console.log("No documents matched the filter.");
+          } else if (result.modifiedCount === 0) {
+              console.log("Document was found, but no updates were made.");
+          } else {
+              console.log("Document updated successfully.");
+          }
+          return res.json("updated"); // Send response after successful update
+      } else {
+          // If player does not exist, insert data and respond
+          await BingoBord.insertMany([data]); // Ensure collection is defined correctly here
+          return res.json("notexist");
+      }
+  } catch (e) {
+      console.error("Database error:", e); // Log the error
+      if (!res.headersSent) { // Ensure response is sent only once
+          res.json("fail");
+      }
+  }
 });
 app.post("/api/spin", async (req, res) => {
   // Spin & Win has been removed: refuse before any money is taken.

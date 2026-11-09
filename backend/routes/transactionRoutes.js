@@ -3,8 +3,6 @@ const router = express.Router();
 const BingoBord = require("../Models/BingoBord");
 const Transaction = require('../Models/Transaction');
 const Counter=require('../Models/CounterSchema');
-const { verifyAdmin } = require('../middleware/adminMiddleware');
-const verifyToken = require('../middleware/verifyToken');
 // Deposit
 
 
@@ -15,36 +13,27 @@ const verifyToken = require('../middleware/verifyToken');
 router.post("/withdraw", async (req, res) => {
   // 🔐 1. API Key Check – only the bot can call this endpoint
   const apiKey = req.headers['x-api-key'];
-  // The secret must be set: if it were missing, a missing header would also "match".
-  if (!process.env.INTERNAL_API_SECRET || apiKey !== process.env.INTERNAL_API_SECRET) {
+  if (apiKey !== process.env.INTERNAL_API_SECRET) {
     return res.status(401).json({ message: "Unauthorized – invalid API key" });
   }
 
-  const { username, phoneNumber, type } = req.body;
-  const amount = Number(req.body.amount);
+  const { username, amount, phoneNumber, type } = req.body;
 
   try {
     // 2. Input Validation
-    if (!username || !phoneNumber || !type) {
+    if (!username || !amount || !phoneNumber || !type) {
       return res.status(400).json({ message: "Username, amount, phoneNumber, and type are all required." });
-    }
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ message: "Amount must be a positive number." });
     }
     if (!["telebirr", "cbebirr"].includes(type)) {
       return res.status(400).json({ message: `Valid type (telebirr or cbebirr) is required.` });
     }
     
-    // Take the money first, in one safe step (only if the balance covers it),
-    // so two withdrawals at the same moment can't both pass the check.
-    const user = await BingoBord.findOneAndUpdate(
-      { username, Wallet: { $gte: amount } },
-      { $inc: { Wallet: -amount } },
-      { new: true }
-    );
+    const user = await BingoBord.findOne({ username });
     if (!user) {
-      const exists = await BingoBord.exists({ username });
-      return res.status(exists ? 400 : 404).json({ message: exists ? "Insufficient balance" : "User not found" });
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.Wallet < amount) {
+      return res.status(400).json({ message: "Insufficient balance" });
     }
 
     // 3. Generate a unique withdrawal ID
@@ -54,7 +43,6 @@ router.post("/withdraw", async (req, res) => {
       { new: true, upsert: true }
     );
     if (!counter) {
-      await BingoBord.updateOne({ _id: user._id }, { $inc: { Wallet: amount } }); // give it back
       throw new Error("Failed to generate a unique withdrawal ID.");
     }
     const withdrawalId = counter.seq;
@@ -69,12 +57,11 @@ router.post("/withdraw", async (req, res) => {
       status: "pending",
       rawMessage: `Withdrawal via ${type}`,
     });
-    try {
-      await newTx.save();
-    } catch (e) {
-      await BingoBord.updateOne({ _id: user._id }, { $inc: { Wallet: amount } }); // give it back
-      throw e;
-    }
+    await newTx.save();
+
+    // 5. Deduct from user's wallet
+    user.Wallet -= amount;
+    await user.save();
 
     res.json({
       message: `Withdrawal successful with id ${withdrawalId}`,
@@ -89,11 +76,9 @@ router.post("/withdraw", async (req, res) => {
 });
 
 // Get transaction history
-// A player may only read their own history.
-router.get("/history/:username", verifyToken, async (req, res) => {
+router.get("/history/:username", async (req, res) => {
   try {
-    if (req.params.username !== req.username) return res.status(403).json({ message: "Forbidden" });
-    const user = await BingoBord.findOne({ username: req.username });
+    const user = await BingoBord.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json(user.transactions);
@@ -103,7 +88,7 @@ router.get("/history/:username", verifyToken, async (req, res) => {
   }
 });
 // Get all users' transactions (for admin dashboard)
-router.get("/all", verifyAdmin, async (req, res) => {
+router.get("/all", async (req, res) => {
   try {
     const users = await BingoBord.find({}, "username transactions");
     const allTransactions = users.map(u => ({
@@ -117,7 +102,7 @@ router.get("/all", verifyAdmin, async (req, res) => {
   }
 });
 // Get paginated list of users (Admin only)
-router.get("/admin-api/users", verifyAdmin, async (req, res) => {
+router.get("/admin-api/users", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;

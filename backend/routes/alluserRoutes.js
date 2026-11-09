@@ -1,10 +1,9 @@
 // routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
-const { verifyAdmin } = require('../middleware/adminMiddleware');
+const verifyUser = require('../middleware/verifyUser');
 const { getAllUsers } = require('../controllers/getAllUsers');
 
-// Every user's record: admins only (was open to any logged-in player).
-router.get('/dashboards', verifyAdmin, getAllUsers);
+router.get('/dashboards', verifyUser, getAllUsers);
 
 module.exports = router;

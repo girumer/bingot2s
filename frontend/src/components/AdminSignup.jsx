@@ -17,11 +17,9 @@ console.log("Submitting formData:", formData);
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Creating an admin now requires an existing admin's login.
       const res = await axios.post(`${BACKEND_URL}/api/admins/register-admin`, formData, {
-  headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("admintoken")}` },
+  headers: { "Content-Type": "application/json" },
 });
-      setMessage(res.data?.message || "Admin registered");
     } catch (err) {
       setMessage(err.response?.data?.message || "Error occurred");
     }

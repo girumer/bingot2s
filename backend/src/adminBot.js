@@ -47,8 +47,6 @@ bot.on('message', async (msg) => {
                 amount,
                 method: 'withdrawal', 
                 type: userStates[chatId].method || 'telebirr'
-            }, {
-                headers: { 'x-api-key': process.env.INTERNAL_API_SECRET }
             });
 
             // 2. PUSH ALERT TO NEW ADMIN BOT

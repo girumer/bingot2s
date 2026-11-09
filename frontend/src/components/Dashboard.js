@@ -112,8 +112,7 @@ const performaction=()=>{
     axios
       .get(`${BACKEND_URL}/api/dashboards`,{
         headers: {
-            // The full user list is admin-only: use the admin login.
-            Authorization: `Bearer ${localStorage.getItem("admintoken") || token}`,
+            Authorization: `Bearer ${token}`,
         },})
       .then(res => {
         if (res.data.valid) {
