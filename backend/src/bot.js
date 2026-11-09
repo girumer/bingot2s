@@ -312,12 +312,11 @@ bot.onText(/^\/start\s?(\d+)?$/, async (msg, match) => {
                 userStates[chatId].referrerId = Number(referrerId);
             }
 
-            bot.sendMessage(chatId, "Welcome! Please share your phone number to register:", {
+            bot.sendMessage(chatId, "Welcome! Tap the button below to share your phone number and register:", {
                 reply_markup: {
                     keyboard: [[{ text: "📱 Share Contact", request_contact: true }]],
                     resize_keyboard: true,
-                    one_time_keyboard: true,
-                    remove_keyboard: true
+                    one_time_keyboard: true
                 }
             });
         } else {
@@ -737,10 +736,32 @@ const withdrawalId = res.data.withdrawalId;
 // ----------------------
 // Handle Contact
 // ----------------------
+// Hides the "Share Contact" keyboard at the bottom of the chat.
+const removeKeyboard = { reply_markup: { remove_keyboard: true } };
+
 bot.on("contact", async (msg) => {
+  try {
   const chatId = msg.chat.id;
   const contact = msg.contact;
-  const state = userStates[chatId];
+  if (!contact || !contact.phone_number) return;
+
+  // Only accept the player's OWN number (not a forwarded contact card).
+  if (contact.user_id && msg.from && contact.user_id !== msg.from.id) {
+    bot.sendMessage(chatId, "⚠️ Please share your own number using the 📱 Share Contact button.");
+    return;
+  }
+
+  // If the bot restarted after /start, the step is gone from memory:
+  // still register anyone who isn't registered yet.
+  let state = userStates[chatId];
+  if (!state || state.step !== "waitingForContact") {
+    const already = await BingoBord.findOne({ telegramId: chatId });
+    if (already) {
+      bot.sendMessage(chatId, "⚠️ You are already registered!", removeKeyboard);
+      return;
+    }
+    state = userStates[chatId] = { step: "waitingForContact" };
+  }
 
   if (state && state.step === "waitingForContact") {
     console.log(`Contact phone raw: "${contact.phone_number}"`);
@@ -749,21 +770,22 @@ bot.on("contact", async (msg) => {
 
     const blocked = await db.collection("blockednumbers").findOne({ phoneNumber: cleanPhone });
     if (blocked) {
-      bot.sendMessage(chatId, "⛔ This phone number is not allowed to register. Contact support if you believe this is an error.");
+      bot.sendMessage(chatId, "⛔ This phone number is not allowed to register. Contact support if you believe this is an error.", removeKeyboard);
       delete userStates[chatId];
       return;
     }
 
     let existingUser = await BingoBord.findOne({ telegramId: chatId });
     if (existingUser) {
-      bot.sendMessage(chatId, "⚠️ You are already registered!");
+      bot.sendMessage(chatId, "⚠️ You are already registered!", removeKeyboard);
       delete userStates[chatId];
       return;
     }
 
-    existingUser = await BingoBord.findOne({ phoneNumber: contact.phone_number });
+    // The same number can arrive as "+2519…" or "2519…": check both forms.
+    existingUser = await BingoBord.findOne({ phoneNumber: { $in: [contact.phone_number, cleanPhone, `+${cleanPhone}`] } });
     if (existingUser) {
-      bot.sendMessage(chatId, "⚠️ This phone number is already registered by another user.");
+      bot.sendMessage(chatId, "⚠️ This phone number is already registered by another user.", removeKeyboard);
       delete userStates[chatId];
       return;
     }
@@ -830,7 +852,14 @@ if (state.referrerId) {
 }
 
     delete userStates[chatId];
-    bot.sendMessage(chatId, "✅ Registration complete! 🎉", mainMenu);
+    // First message removes the Share Contact keyboard, second shows the menu
+    // (Telegram can't do both in one message).
+    await bot.sendMessage(chatId, "✅ Registration complete! 🎉", removeKeyboard);
+    bot.sendMessage(chatId, "Choose an option:", mainMenu);
+  }
+  } catch (err) {
+    console.error("Contact registration error:", err);
+    bot.sendMessage(msg.chat.id, "❌ Registration failed. Please try /start again.").catch(() => {});
   }
 });
 // ----------------------
