@@ -841,7 +841,7 @@ if (state.referrerId) {
         ],
       },
       {
-        $inc: { Wallet: 2, referralCount: 1 },
+        $inc: { Wallet: 0, referralCount: 1 },
       },
       { new: true }
     );
