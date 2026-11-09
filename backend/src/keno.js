@@ -24,9 +24,9 @@ const mongoose = require("mongoose");
 
 // ---------------- SETTINGS (change these, not the code below) ----------------
 const KENO_CONFIG = {
-  // Game flow: waiting (no tickets, nothing runs) → betting countdown starts with
-  // the first ticket → 20 numbers called one per second → short check pause → next game.
-  JOIN_WINDOW_MS: 35 * 1000,   // countdown after the first ticket so others can join
+  // Game flow (runs all the time, with or without players):
+  // 60-second countdown → 20 numbers called one per second → 5-second check → next game.
+  JOIN_WINDOW_MS: 60 * 1000,   // countdown before every game
   BET_CLOSE_MS: 1 * 1000,      // tickets in the last second go to the next game
   CALL_INTERVAL_MS: 1000,      // one number called per second
   CHECK_WINDOW_MS: 5 * 1000,   // after the 20th number, time to check tickets
@@ -81,6 +81,7 @@ const KenoTicketSchema = new mongoose.Schema({
   drawId: { type: Number, required: true, index: true },
   telegramId: { type: Number, required: true, index: true },
   username: { type: String },
+  label: { type: String },       // what other players see, e.g. "9***8"
   betType: { type: String, enum: BET_TYPES, default: "numbers" },
   picks: { type: [Number], default: [] },
   stake: { type: Number, required: true },
@@ -151,15 +152,16 @@ function drawSummary(numbers) {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
-// Name shown to other players: the player's real username.
-// Usernames that are phone numbers keep the middle digits hidden.
-function displayName(username) {
-  const name = String(username || "Player").trim();
-  const digits = name.replace(/\D/g, "");
-  if (digits.length >= 7 && digits.length >= name.replace(/[\s+\-()]/g, "").length - 1) {
-    return `${name.slice(0, 4)}****${name.slice(-2)}`;
-  }
-  return name.length > 20 ? `${name.slice(0, 19)}…` : name;
+// What other players see on a ticket: the first digit after 251 and the last
+// digit of the phone number, e.g. +251 912 345 678 → "9***8". Never the name.
+function phoneLabel(phoneNumber, fallback) {
+  let digits = String(phoneNumber || "").replace(/\D/g, "");
+  if (digits.startsWith("251")) digits = digits.slice(3);
+  else if (digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length >= 2) return `${digits[0]}***${digits[digits.length - 1]}`;
+  // no phone on record: mask whatever we have the same way
+  const chars = Array.from(String(fallback || "player").replace(/\s/g, ""));
+  return chars.length >= 2 ? `${chars[0]}***${chars[chars.length - 1]}` : "***";
 }
 
 // Score one ticket against a draw.
@@ -285,18 +287,12 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     emitRound();
     console.log(`[KENO] Game #${drawId}: countdown started`);
   }
-  function goWaiting(drawId) {
-    round.drawId = drawId;
-    round.phase = "waiting";
-    round.drawAt = round.numbers = round.startedAt = round.endsAt = null;
-    emitRound();
-  }
 
   // Public view of a ticket for the live players list (no Telegram ids).
   const publicTicket = (t) => ({
     id: String(t._id),
     drawId: t.drawId,
-    name: displayName(t.username),
+    name: t.label || phoneLabel(null, t.username),
     betType: t.betType || "numbers",
     picks: t.picks || [],
     stake: t.stake,
@@ -444,6 +440,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
               drawId,
               telegramId: user.id,
               username: player.username,
+              label: phoneLabel(player.phoneNumber, player.username),
               betType: bet.betType,
               picks: bet.picks,
               stake: bet.stake,
@@ -621,10 +618,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
   let lastIdleCheck = 0;
 
   async function nextGame() {
-    const nextId = round.drawId + 1;
-    const hasTickets = await KenoTicket.exists({ drawId: nextId, status: "pending" });
-    if (hasTickets) startBetting(nextId);
-    else goWaiting(nextId);
+    startBetting(round.drawId + 1);
   }
 
   async function tick() {
@@ -673,8 +667,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     const firstPending = await KenoTicket.findOne({ status: "pending", drawId: { $gt: lastId } })
       .sort({ drawId: 1 })
       .lean();
-    if (firstPending) startBetting(firstPending.drawId);
-    else goWaiting(lastId + 1);
+    startBetting(firstPending ? firstPending.drawId : lastId + 1);
     ready = true;
   }
 

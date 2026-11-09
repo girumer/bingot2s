@@ -50,14 +50,10 @@ function summarize(numbers) {
 }
 const timeOf = (ms) =>
   new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Addis_Ababa" });
-// Same rule as the server: real username, phone numbers partly hidden.
-const displayName = (username) => {
-  const name = String(username || "Player").trim();
-  const digits = name.replace(/\D/g, "");
-  if (digits.length >= 7 && digits.length >= name.replace(/[\s+\-()]/g, "").length - 1) {
-    return `${name.slice(0, 4)}****${name.slice(-2)}`;
-  }
-  return name.length > 20 ? `${name.slice(0, 19)}…` : name;
+// Fallback mask for old tickets saved before phone labels: first***last.
+const maskLabel = (text) => {
+  const chars = Array.from(String(text || "player").replace(/\s/g, ""));
+  return chars.length >= 2 ? `${chars[0]}***${chars[chars.length - 1]}` : "***";
 };
 const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -245,7 +241,7 @@ const FastKeno = () => {
   const maxStake = config?.MAX_STAKE ?? 100;
   const clampStake = (v) => Math.min(maxStake, Math.max(minStake, Math.round(Number(v) || minStake)));
   const safeStake = clampStake(stake);
-  const joinMs = config?.JOIN_WINDOW_MS ?? 35000;
+  const joinMs = config?.JOIN_WINDOW_MS ?? 60000;
   const secondsLeft = round.drawAt ? Math.max(0, Math.ceil((round.drawAt - serverNow) / 1000)) : 0;
   const pickSet = useMemo(() => new Set(picks), [picks]);
 
@@ -374,7 +370,7 @@ const FastKeno = () => {
 
   // Ticket list with All / My Tickets / My Bets filters.
   const myIds = new Set(tickets.map((t) => String(t._id)));
-  const asCard = (t) => ({ id: String(t._id), name: displayName(t.username || myName), betType: t.betType || "numbers", picks: t.picks || [], stake: t.stake, drawId: t.drawId });
+  const asCard = (t) => ({ id: String(t._id), name: t.label || maskLabel(t.username || myName), betType: t.betType || "numbers", picks: t.picks || [], stake: t.stake, drawId: t.drawId });
   const myGameTickets = tickets.filter((t) => t.drawId === listDrawId).map(asCard);
   const myBets = tickets.filter((t) => t.drawId >= (listDrawId || 0)).map(asCard);
   const renderTicketBoard = ({ drawn, done }) => {
@@ -409,7 +405,10 @@ const FastKeno = () => {
       <div className="keno-inner">
         <div className="kn-head">
           <div>
-            <div className="kn-title">Fast Keno</div>
+            <div className="kn-logo" aria-label="Fast Keno">
+              <span className="kn-logo-fast">FAST</span>
+              <span className="kn-logo-keno">KENO<i /></span>
+            </div>
             <div className="kn-sub">
               Game #{(focus ? round.draw?.drawId : round.drawId) ?? "—"} ·{" "}
               <span className={`kn-status ${phase}`}>{statusText}</span>
@@ -462,12 +461,6 @@ const FastKeno = () => {
 
             {tab === "play" && (
               <>
-                {phase === "waiting" && (
-                  <div className="kn-waiting">
-                    <strong>Waiting for players</strong>
-                    <span>Place a ticket to start the game. Others get {Math.round(joinMs / 1000)} seconds to join.</span>
-                  </div>
-                )}
 
                 <section className="kn-grid">
                     {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => (

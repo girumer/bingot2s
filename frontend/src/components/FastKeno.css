@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,700;0,900;1,900&display=swap');
 /* Fast Keno — colours match the FPL page (navy + green) */
 .keno {
   --bg: #1b202c;
@@ -715,3 +716,51 @@
 .kt-slot.hit { background: #5cc27c; box-shadow: none; }
 .kt-tabs { padding: 8px 6px; }
 .kt-tabs button { font-size: 14px; }
+
+/* ================= v15: Vamos-style logo, bold board numbers ================= */
+.keno { font-family: "Roboto Condensed", "Arial Narrow", -apple-system, "Segoe UI", sans-serif; }
+
+/* FAST (white) over KENO (green) with a play triangle, italic heavy like the reference */
+.kn-logo {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 0.82;
+  font-family: "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  transform: skewX(-6deg);
+  user-select: none;
+}
+.kn-logo-fast { color: #fff; font-size: 26px; text-shadow: 0 1px 0 #1b202c, 0 0 6px rgba(255, 255, 255, 0.15); }
+.kn-logo-keno {
+  color: #3ddc84;
+  font-size: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  text-shadow: 0 0 10px rgba(61, 220, 132, 0.25);
+}
+.kn-logo-keno i {
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 15px solid #3ddc84;
+  margin-left: 2px;
+}
+.kn-head { align-items: center; }
+.kn-sub { margin-top: 6px; font-size: 14px; font-weight: 700; }
+
+/* 80-number board: bigger, heavier numbers */
+.kn-cell {
+  font-family: "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: clamp(17px, 5vw, 22px);
+  font-weight: 900;
+  letter-spacing: -0.3px;
+}
+.kn-grid { gap: 4px; }
+
+/* draw balls and ticket numbers use the same heavy font */
+.kd-ball, .kd-big, .kt-slot, .kt-bet, .kt-status, .kt-id, .kd-count { font-family: "Roboto Condensed", "Arial Narrow", sans-serif; }
+.kd-count { font-weight: 900; letter-spacing: 1px; }
