@@ -34,7 +34,9 @@ function WalletPage() {
 
     const fetchWalletAndCoins = async () => {
       try {
-        const res = await axios.get(`${BACKEND_URL}/api/wallet/${username}`);
+        const res = await axios.get(`${BACKEND_URL}/api/wallet/${username}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("accesstoken")}` },
+        });
         setWallet(res.data.Wallet);
         setCoins(res.data.coins);
       } catch (err) {
@@ -85,22 +87,18 @@ function WalletPage() {
   // --- Convert coins to wallet ---
   const handleConvertCoins = async () => {
     if (!username) return;
-    if (coins < 20) return alert("You need at least 20 coins to convert");
-
-    const walletIncrement = Math.floor(coins / 20);
-    const remainingCoins = coins % 20;
+    if (!coins || coins < 0.01) return alert("You have no coins to convert");
 
     try {
-      await axios.post(`${BACKEND_URL}/api/wallet/convertCoins`, {
-        username,
-        walletIncrement,
-        remainingCoins,
+      // The server works out the conversion (1 coin = 1 birr, same as the bot).
+      const { data } = await axios.post(`${BACKEND_URL}/api/wallet/convertCoins`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("accesstoken")}` },
       });
 
-      setWallet(prev => prev + walletIncrement);
-      setCoins(remainingCoins);
+      setWallet(data.Wallet);
+      setCoins(data.coins);
 
-      alert(`Converted ${walletIncrement * 20} coins to ${walletIncrement} Wallet`);
+      alert(`Converted ${data.converted} coins to ${data.converted} birr`);
     } catch (err) {
       console.error(err);
       alert("Conversion failed");

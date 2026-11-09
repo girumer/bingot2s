@@ -17,7 +17,12 @@ const loginUser = async (req, res) => {
       return res.json({ message: "Insufficient balance" });
     }
 
-    const role = existingUser.role;
+    // Admins must use the password admin login. This username+phone login has no
+    // password, so it must never produce an admin token.
+    if (existingUser.role === 'admin') {
+      return res.json({ message: "Admins must sign in on the admin login page." });
+    }
+    const role = 'client';
     const accessToken = jwt.sign({ username, role,phoneNumber }, secretkey, { expiresIn: '1d' });
     const refreshToken = jwt.sign({ username }, refreshKey, { expiresIn: '30d' });
 

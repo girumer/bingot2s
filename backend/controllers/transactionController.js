@@ -421,7 +421,9 @@ const totalCreditedAmount = roundTwo(finalAmount + bonusAmount);
 
         // Step 4: Find the PENDING transaction using the provided transactionNumber.
         // This is where the core security check happens. It ensures a pending deposit exists for this transaction ID.
-        const updatedTx = await Transaction.findOne({
+        // Claim the pending deposit in ONE step: find it and remove it together,
+        // so the same deposit can never be claimed twice.
+        const updatedTx = await Transaction.findOneAndDelete({
             transactionNumber: finalTxnNumber,
             method: "depositpend",
             amount: finalAmount, // Verify the amount to prevent fraud
@@ -435,7 +437,20 @@ const totalCreditedAmount = roundTwo(finalAmount + bonusAmount);
         // The rest of the code is secure because it's based on a pending transaction created by your admin.
 
         // Step 5: Process the transaction and handle referral bonus.
-       user.Wallet = roundTwo(user.Wallet + totalCreditedAmount);
+       // Credit in one safe step (never overwrite a balance read earlier).
+       let credited;
+       try {
+           credited = await BingoBord.findOneAndUpdate(
+               { _id: user._id },
+               { $inc: { Wallet: totalCreditedAmount } },
+               { new: true }
+           );
+       } catch (e) {
+           // Put the pending deposit back so it can be claimed again.
+           await Transaction.create(updatedTx.toObject());
+           throw e;
+       }
+       user.Wallet = roundTwo(credited.Wallet);
 
          const newTransaction = new Transaction({
            
@@ -447,19 +462,10 @@ const totalCreditedAmount = roundTwo(finalAmount + bonusAmount);
             status: 'completed',
         });
         await newTransaction.save();
-        if (user.referredBy ) {
-            const referer = await BingoBord.findOne({ telegramId: user.referredBy });
-            if (referer) {
-                const bonusAmount = finalAmount * 0;
-                referer.Wallet += bonusAmount;
-                await referer.save();
-                user.referralBonusPaid = true;
-                console.log(`Referral bonus of ${bonusAmount} ETB paid to user ${referer.telegramId}`);
-            }
+        if (user.referredBy && !user.referralBonusPaid) {
+            // (Referral deposit bonus is currently 0 ETB; only the flag is recorded.)
+            await BingoBord.updateOne({ _id: user._id }, { $set: { referralBonusPaid: true } });
         }
-        
-        await user.save();
-        await Transaction.deleteOne({ transactionNumber: finalTxnNumber });
         
         console.log(`User wallet updated. New balance: ${user.Wallet}`);
         

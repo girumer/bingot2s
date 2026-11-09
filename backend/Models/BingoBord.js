@@ -40,7 +40,7 @@ const BingoBordSchema = new mongoose.Schema({
   },
   Wallet: {
     type: Number,
-    default: 200
+    default: 0   // was 200: any account created without an explicit amount got 200 ETB free
   },
   coins: {
     type: Number,
