@@ -166,6 +166,7 @@ const commands = [
   { command: "start", description: "🏠 start" }, // Corrected line
   { command: "balance", description: "💰 Check your balance" },
   { command: "play", description: "🎮 Play Bingo" },
+  { command: "keno", description: "🎱 Fast Keno" },
   { command: "invite", description: "🎁 Invite friends" },
   { command: "deposit", description: "📥 Deposit funds" },
   { command: "coins", description: "🪙 Check your Coin balance" },
@@ -196,7 +197,7 @@ let userStates = {}; // { chatId: { step: "askName" | "askPhone" | "depositAmoun
 // ----------------------
 // Handle Commands (like /balance, /play, etc.)
 // ----------------------
-bot.onText(/\/(balance|play|deposit|history|help|withdraw|coins)/, async (msg, match) => {
+bot.onText(/\/(balance|play|deposit|history|help|withdraw|coins|keno)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const cmd = match[1]; // the command without '/'
   
@@ -281,6 +282,16 @@ bot.onText(/\/(balance|play|deposit|history|help|withdraw|coins)/, async (msg, m
        
 
 // ... rest of the switch cases ...
+      case "keno":
+        bot.sendMessage(chatId, `🎱 <b>Fast Keno</b>\n\nPick 1–10 numbers from 1–80. A new draw every minute — match numbers to win!`, {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🎱 Play Fast Keno", web_app: { url: `${process.env.FRONTEND_URL}/FastKeno` } }]
+            ]
+          }
+        });
+        break;
       case "help":
         bot.sendMessage(chatId, "Use the menu to check balance, play games, or see your history. If you need further assistance, please contact our support team.", {
           reply_markup: {
