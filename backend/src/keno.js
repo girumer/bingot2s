@@ -38,7 +38,8 @@ const KENO_CONFIG = {
   MAX_STAKE: 100,
   MAX_WIN_PER_TICKET: 10000,     // cap on one ticket's payout (birr)
   MAX_TICKETS_PER_DRAW: 10,      // per player, per draw
-  MULTI_DRAW_OPTIONS: [1, 5, 10],// how many consecutive draws one ticket can play
+  MULTI_DRAW_OPTIONS: [1],      // tickets play one game (add 5, 10 here to allow multi-game tickets)
+  SIDE_BETS_ENABLED: false,     // Heads/Tails and Odd/Even off (true turns them back on)
 };
 
 // PAYTABLE[picks][matches] = stake multiplier (numbers bets)
@@ -132,7 +133,8 @@ function generateDrawNumbers() {
     const j = crypto.randomInt(i + 1);
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, KENO_CONFIG.DRAWN_NUMBERS).sort((a, b) => a - b);
+  // Kept in the order drawn, so numbers are called in random order (not sorted).
+  return pool.slice(0, KENO_CONFIG.DRAWN_NUMBERS);
 }
 
 function drawSummary(numbers) {
@@ -202,6 +204,7 @@ function validatePicks(picks) {
 function parseBet(body) {
   const betType = body.betType || "numbers";
   if (!BET_TYPES.includes(betType)) return { error: "Unknown bet type." };
+  if (betType !== "numbers" && !KENO_CONFIG.SIDE_BETS_ENABLED) return { error: "Only number tickets are available." };
 
   const stake = Number(body.stake);
   if (!Number.isInteger(stake) || stake < KENO_CONFIG.MIN_STAKE || stake > KENO_CONFIG.MAX_STAKE) {

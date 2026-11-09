@@ -18,15 +18,6 @@ const TABS = [
   { id: "history", label: "🕘 History" },
   { id: "results", label: "🏆 Results" },
 ];
-const MODES = [
-  { id: "numbers", label: "Numbers" },
-  { id: "ht", label: "Heads / Tails" },
-  { id: "oe", label: "Odd / Even" },
-];
-const SIDE_OPTIONS = {
-  ht: ["heads", "ht_evens", "tails"],
-  oe: ["odd", "oe_evens", "even"],
-};
 const BET_LABEL = {
   numbers: "Numbers",
   heads: "Heads",
@@ -100,11 +91,8 @@ const FastKeno = () => {
   const [now, setNow] = useState(Date.now());
 
   const [results, setResults] = useState([]);
-  const [mode, setMode] = useState("numbers");
-  const [sideChoice, setSideChoice] = useState({ ht: "heads", oe: "odd" });
   const [picks, setPicks] = useState([]);
   const [stake, setStake] = useState(2);
-  const [draws, setDraws] = useState(1);
   const [wallet, setWallet] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [placing, setPlacing] = useState(false);
@@ -257,12 +245,9 @@ const FastKeno = () => {
   const maxStake = config?.MAX_STAKE ?? 100;
   const clampStake = (v) => Math.min(maxStake, Math.max(minStake, Math.round(Number(v) || minStake)));
   const safeStake = clampStake(stake);
-  const totalCost = safeStake * draws;
-  const drawOptions = config?.MULTI_DRAW_OPTIONS ?? [1, 5, 10];
   const joinMs = config?.JOIN_WINDOW_MS ?? 35000;
   const secondsLeft = round.drawAt ? Math.max(0, Math.ceil((round.drawAt - serverNow) / 1000)) : 0;
   const pickSet = useMemo(() => new Set(picks), [picks]);
-  const betType = mode === "numbers" ? "numbers" : sideChoice[mode];
 
   // numbers called so far (worked out from the server's start time)
   const called = useMemo(() => {
@@ -290,14 +275,9 @@ const FastKeno = () => {
     : phase === "drawing" ? `Calling ${called.length} / 20`
     : "Check your tickets";
 
-  const rows = useMemo(() => {
-    const row = paytable[picks.length] || {};
-    return Object.entries(row).map(([m, mult]) => ({ matches: Number(m), mult })).sort((a, b) => b.matches - a.matches);
-  }, [paytable, picks.length]);
 
   // ---------- actions ----------
   const togglePick = (n) => {
-    if (mode !== "numbers") return;
     setPicks((p) => {
       if (p.includes(n)) return p.filter((x) => x !== n);
       if (p.length >= maxPicks) {
@@ -320,16 +300,16 @@ const FastKeno = () => {
 
   const placeBet = async () => {
     if (!initData) return toast.error("Open Fast Keno from the Telegram bot.");
-    if (betType === "numbers" && !picks.length) return toast.info("Pick at least 1 number.");
-    if (wallet !== null && wallet < totalCost) return toast.error("Insufficient balance.");
+    if (!picks.length) return toast.info("Pick at least 1 number.");
+    if (wallet !== null && wallet < safeStake) return toast.error("Insufficient balance.");
     setPlacing(true);
     try {
       const { data } = await axios.post(`${BACKEND_URL}/api/keno/bet`, {
         initData,
-        betType,
-        picks: betType === "numbers" ? picks : [],
+        betType: "numbers",
+        picks,
         stake: safeStake,
-        draws,
+        draws: 1,
       });
       setWallet(data.wallet);
       setTickets((t) => [...[...data.tickets].reverse(), ...t].slice(0, 30));
@@ -489,16 +469,7 @@ const FastKeno = () => {
                   </div>
                 )}
 
-                <div className="kn-pills">
-                  {MODES.map((m) => (
-                    <button key={m.id} className={`kn-pill ${mode === m.id ? "active" : ""}`} onClick={() => setMode(m.id)}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-
-                {mode === "numbers" ? (
-                  <section className="kn-grid">
+                <section className="kn-grid">
                     {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => (
                       <button
                         key={n}
@@ -508,50 +479,23 @@ const FastKeno = () => {
                         {n}
                       </button>
                     ))}
-                  </section>
-                ) : (
-                  <section className="kn-card">
-                    <p className="kn-muted kn-mt0">
-                      {mode === "ht"
-                        ? "Heads wins if more of the 20 numbers are 1–40, Tails if more are 41–80. Evens wins on a 10–10 split."
-                        : "Odd wins if more of the 20 numbers are odd, Even if more are even. Evens wins on a 10–10 split."}
-                    </p>
-                    <div className="kn-side">
-                      {SIDE_OPTIONS[mode].map((b) => (
-                        <button
-                          key={b}
-                          className={`kn-side-btn ${sideChoice[mode] === b ? "active" : ""} ${b.includes("evens") ? "evens" : ""}`}
-                          onClick={() => setSideChoice((s) => ({ ...s, [mode]: b }))}
-                        >
-                          <span>{BET_LABEL[b].replace("H/T ", "").replace("O/E ", "")}</span>
-                          <strong>×{sideBets[b]?.multiplier ?? "—"}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                </section>
 
                 <section className="kn-card">
                   <div className="kn-card-head">
                     <span>My selection</span>
-                    {mode === "numbers" && (
-                      <span className="kn-row-btns">
-                        <button className="kn-ghost" onClick={quickPick}>🎲 Auto</button>
-                        <button className="kn-ghost" onClick={() => setPicks([])}>Reset</button>
-                      </span>
-                    )}
+                    <span className="kn-row-btns">
+                      <button className="kn-ghost" onClick={quickPick}>🎲 Auto</button>
+                      <button className="kn-ghost" onClick={() => setPicks([])}>Reset</button>
+                    </span>
                   </div>
-                  {mode === "numbers" ? (
-                    picks.length ? (
-                      <>
-                        <PickChips nums={[...picks].sort((a, b) => a - b)} />
-                        <div className="kn-muted kn-mt6">{picks.length}/{maxPicks} picked</div>
-                      </>
-                    ) : (
-                      <p className="kn-muted kn-mt0">Tap numbers on the board, or press Auto.</p>
-                    )
+                  {picks.length ? (
+                    <>
+                      <PickChips nums={[...picks].sort((a, b) => a - b)} />
+                      <div className="kn-muted kn-mt6">{picks.length}/{maxPicks} picked</div>
+                    </>
                   ) : (
-                    <div className="kn-selected-side"><Badge type={betType} /> {BET_LABEL[betType]} · pays ×{sideBets[betType]?.multiplier ?? "—"}</div>
+                    <p className="kn-muted kn-mt0">Tap numbers on the board, or press Auto.</p>
                   )}
 
                   <div className="kn-label">Stake per game (ETB)</div>
@@ -571,40 +515,17 @@ const FastKeno = () => {
                   </div>
                   <div className="kn-hint">Min {minStake} · Max {maxStake}</div>
 
-                  <div className="kn-label">Play for</div>
-                  <div className="kn-draws">
-                    {drawOptions.map((d) => (
-                      <button key={d} className={`kn-pill ${draws === d ? "active" : ""}`} onClick={() => setDraws(d)}>
-                        {d} game{d > 1 ? "s" : ""}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button className="kn-bet" disabled={placing || (betType === "numbers" && !picks.length)} onClick={placeBet}>
-                    {placing ? "Placing…" : `Bet ${totalCost} ETB — ${BET_LABEL[betType]}${draws > 1 ? ` × ${draws}` : ""}`}
+                  <button className="kn-bet" disabled={placing || !picks.length} onClick={placeBet}>
+                    {placing ? "Placing…" : `Bet ${safeStake} ETB`}
                   </button>
 
-                  {mode === "numbers" && picks.length > 0 && (
-                    <table className="kn-paytable">
-                      <thead><tr><th>Matches</th><th>Pays</th><th>You win</th></tr></thead>
-                      <tbody>
-                        {rows.map((r) => (
-                          <tr key={r.matches}>
-                            <td>{r.matches}</td>
-                            <td>×{r.mult}</td>
-                            <td className="kn-green">{Math.min(safeStake * r.mult, config?.MAX_WIN_PER_TICKET ?? Infinity).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
                 </section>
 
                 {renderTicketBoard({ drawn: null, done: false })}
 
                 <p className="kn-fine">
                   20 of 80 numbers are drawn at random, one per second. Prizes come from fixed tables, so everyone has the
-                  same chance. On average every bet type pays back about 80% of stakes.
+                  same chance. On average the game pays back about 80% of stakes.
                   {config ? ` Max win per ticket: ${config.MAX_WIN_PER_TICKET.toLocaleString()} ETB.` : ""}
                 </p>
               </>
