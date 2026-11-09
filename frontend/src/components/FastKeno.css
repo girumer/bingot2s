@@ -764,3 +764,19 @@
 /* draw balls and ticket numbers use the same heavy font */
 .kd-ball, .kd-big, .kt-slot, .kt-bet, .kt-status, .kt-id, .kd-count { font-family: "Roboto Condensed", "Arial Narrow", sans-serif; }
 .kd-count { font-weight: 900; letter-spacing: 1px; }
+
+/* ================= v16: board colours from the reference, max win on tickets ================= */
+.kn-grid { background: #1a1e1f; }
+.kn-cell {
+  background: linear-gradient(180deg, #323a40 0%, #2c3539 50%, #262e31 100%);
+  border: none;
+  color: #9b9ea3;
+  border-radius: 4px;
+}
+.kn-cell:nth-child(n + 41) { background: linear-gradient(180deg, #323a40 0%, #2c3539 50%, #262e31 100%); }
+.kn-cell:active { filter: brightness(1.15); }
+.kn-cell.picked,
+.kn-cell.picked:nth-child(n + 41) { background: linear-gradient(180deg, #34d27a 0%, #27b364 100%); color: #fff; }
+
+.kt-status { display: flex; justify-content: space-between; align-items: center; gap: 6px; text-align: left; }
+.kt-max { color: #9b9ea3; font-weight: 700; font-size: 12px; white-space: nowrap; }

@@ -339,6 +339,11 @@ const FastKeno = () => {
   const renderTicketCard = ({ t, drawn, done, mine }) => {
     const type = t.betType || "numbers";
     const prize = done && drawn ? prizeOf(t, [...drawn]) : 0;
+    // Most this ticket can win (all its numbers hit), within the per-ticket cap.
+    const topMult = type === "numbers"
+      ? Math.max(0, ...Object.values(paytable[t.picks.length] || {}))
+      : sideBets[type]?.multiplier || 0;
+    const maxWin = Math.min(Math.round(t.stake * topMult * 100) / 100, config?.MAX_WIN_PER_TICKET ?? Infinity);
     const status = !drawn ? { text: "Waiting", cls: "waiting" }
       : !done ? { text: "Playing", cls: "playing" }
       : prize > 0 ? { text: `Won ${prize}`, cls: "won" }
@@ -362,7 +367,10 @@ const FastKeno = () => {
         </div>
         <div className="kt-foot">
           <div className="kt-bet">Bet {t.stake}</div>
-          <div className={`kt-status ${status.cls}`}>{status.text}</div>
+          <div className={`kt-status ${status.cls}`}>
+            <span className="kt-max">Max {maxWin.toLocaleString()}</span>
+            <span>{status.text}</span>
+          </div>
         </div>
       </div>
     );
