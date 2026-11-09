@@ -945,8 +945,7 @@ bot.on('callback_query', async (callbackQuery) => {
   break;
  case "spin_game":
  case "spin_5":
- case "fpl":
-  // Spin & Win and Fantasy Premier League have been removed.
+  // These games have been removed.
   answerQuery("This game is no longer available.", true);
   break;
     case "gameHistory":

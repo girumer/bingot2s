@@ -40,7 +40,7 @@ const BingoBordSchema = new mongoose.Schema({
   },
   Wallet: {
     type: Number,
-    default: 200
+    default: 0
   },
   coins: {
     type: Number,
@@ -67,9 +67,6 @@ referralCount: {
   type: Number,
   default: 0,
 },
-fplTeamId:   { type: Number, default: null },
-fplTeamName: { type: String, default: null },
-fplSquad:    { type: [Number], default: [] },
 });
 
 // Hash password before saving (only for admins)

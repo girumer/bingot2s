@@ -12,7 +12,7 @@
 //
 // Every 60 seconds the server draws 20 numbers with a secure shuffle.
 // Results depend only on the draw: no bots, nothing depends on who plays.
-// Every paytable row pays back about 79–80% on average (exact odds checked);
+// Every paytable row pays back about 50% on average (exact odds checked);
 // the rest is the house cut.
 //
 // Every wallet change made by keno is written to the WalletLedger
@@ -35,7 +35,7 @@ const KENO_CONFIG = {
   MIN_PICKS: 1,
   MAX_PICKS: 10,
   MIN_STAKE: 2,
-  MAX_STAKE: 100,
+  MAX_STAKE: 20,
   MAX_WIN_PER_TICKET: 10000,     // cap on one ticket's payout (birr)
   MAX_TICKETS_PER_DRAW: 10,      // per player, per draw
   MULTI_DRAW_OPTIONS: [1],      // tickets play one game (add 5, 10 here to allow multi-game tickets)
@@ -43,27 +43,49 @@ const KENO_CONFIG = {
 };
 
 // PAYTABLE[picks][matches] = stake multiplier (numbers bets)
+// CURRENT: ~50% back to players / ~50% house (temporary high-margin table).
 const PAYTABLE = {
-  1: { 1: 3.2 },
-  2: { 2: 13 },
-  3: { 2: 2.8, 3: 30 },
-  4: { 2: 1.6, 3: 7, 4: 50 },
-  5: { 3: 3.5, 4: 22, 5: 380 },
-  6: { 3: 1.5, 4: 8, 5: 65, 6: 1300 },
-  7: { 3: 1.3, 4: 3, 5: 20, 6: 200, 7: 3500 },
-  8: { 4: 2.5, 5: 14, 6: 80, 7: 700, 8: 7000 },
-  9: { 4: 1.2, 5: 6, 6: 40, 7: 250, 8: 2500, 9: 12500 },
-  10: { 0: 3, 5: 2.5, 6: 20, 7: 110, 8: 700, 9: 3500, 10: 14000 },
+  1: { 1: 2 },
+  2: { 2: 8.3 },
+  3: { 2: 1.7, 3: 19 },
+  4: { 2: 1, 3: 4.4, 4: 31 },
+  5: { 3: 2.2, 4: 14, 5: 235 },
+   6: { 4: 5.1, 5: 41, 6: 820 },
+  7: { 4: 1.9, 5: 13, 6: 125, 7: 2200 },
+  9: { 5: 3.8, 6: 25, 7: 155, 8: 1550, 9: 7800 },
+  10: { 0: 1.9, 5: 1.6, 6: 13, 7: 70, 8: 445, 9: 2200, 10: 8850 },
 };
+// --- TO REVERT to ~80% back / 20% house: delete the PAYTABLE above and
+//     uncomment this original one (remove the // from each line). ---
+// const PAYTABLE = {
+//   1: { 1: 3.2 },
+//   2: { 2: 13 },
+//   3: { 2: 2.8, 3: 30 },
+//   4: { 2: 1.6, 3: 7, 4: 50 },
+//   5: { 3: 3.5, 4: 22, 5: 380 },
+//   6: { 3: 1.5, 4: 8, 5: 65, 6: 1300 },
+//   7: { 3: 1.3, 4: 3, 5: 20, 6: 200, 7: 3500 },
+//   8: { 4: 2.5, 5: 14, 6: 80, 7: 700, 8: 7000 },
+//   9: { 4: 1.2, 5: 6, 6: 40, 7: 250, 8: 2500, 9: 12500 },
+//   10: { 0: 3, 5: 2.5, 6: 20, 7: 110, 8: 700, 9: 3500, 10: 14000 },
+// };
 
 // Side bets: P(10/10 split) = 20.3%, P(one side wins) = 39.8% each
-const SIDE_BETS = {
+/* const SIDE_BETS = {
   heads:    { label: "Heads (1–40)",  multiplier: 2 },
   tails:    { label: "Tails (41–80)", multiplier: 2 },
   ht_evens: { label: "Heads/Tails Evens (10–10)", multiplier: 3.9 },
   odd:      { label: "Odd",  multiplier: 2 },
   even:     { label: "Even", multiplier: 2 },
   oe_evens: { label: "Odd/Even Evens (10–10)", multiplier: 3.9 },
+}; */
+const SIDE_BETS = {
+  heads:    { label: "Heads (1–40)",  multiplier: 1.25 },
+  tails:    { label: "Tails (41–80)", multiplier: 1.25 },
+  ht_evens: { label: "Heads/Tails Evens (10–10)", multiplier: 2.45 },
+  odd:      { label: "Odd",  multiplier: 1.25 },
+  even:     { label: "Even", multiplier: 1.25 },
+  oe_evens: { label: "Odd/Even Evens (10–10)", multiplier: 2.45 },
 };
 const BET_TYPES = ["numbers", ...Object.keys(SIDE_BETS)];
 
