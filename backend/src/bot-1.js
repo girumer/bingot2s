@@ -582,12 +582,29 @@ bot.on("message", async (msg) => {
                 return;
             }
             
-            // Perform the transfer
-           
-            sender.Wallet = Number((sender.Wallet -amount).toFixed(2));
-            recipient.Wallet = Number((recipient.Wallet + amount).toFixed(2));
-            
-            await Promise.all([sender.save(), recipient.save()]);
+            // Perform the transfer in safe single steps: take from the sender only if
+            // the balance still covers it, then add to the recipient (refund on failure).
+            const takenFrom = await BingoBord.findOneAndUpdate(
+              { _id: sender._id, Wallet: { $gte: amount } },
+              { $inc: { Wallet: -amount } },
+              { new: true }
+            );
+            if (!takenFrom) {
+              bot.sendMessage(chatId, "❌ You have insufficient funds.");
+              return;
+            }
+            const addedTo = await BingoBord.findOneAndUpdate(
+              { _id: recipient._id },
+              { $inc: { Wallet: amount } },
+              { new: true }
+            );
+            if (!addedTo) {
+              await BingoBord.updateOne({ _id: sender._id }, { $inc: { Wallet: amount } }); // give it back
+              bot.sendMessage(chatId, "❌ Transfer failed. Your balance was not changed.");
+              return;
+            }
+            sender.Wallet = Number(takenFrom.Wallet.toFixed(2));
+            recipient.Wallet = Number(addedTo.Wallet.toFixed(2));
 
            bot.sendMessage(chatId, `✅ Successfully transferred <b>${amount}</b> birr to <b>${recipient.username}</b>! Your new balance is ${sender.Wallet} Birr.`, { parse_mode: 'HTML' });
 bot.sendMessage(recipientId, `🎉 You have received <b>${amount}</b> birr from <b>${sender.username}</b>! Your new balance is ${recipient.Wallet} Birr.`, { parse_mode: 'HTML' });

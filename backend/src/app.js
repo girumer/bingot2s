@@ -562,6 +562,10 @@ const socketIdToClientId = new Map();
 const clientIdToSocketId = new Map();
 const authenticatedSockets = new Map();
  startRoomMonitor();
+// Real bingo rooms (stake = room id). Add a new room here AND in the bot buttons.
+const ALLOWED_STAKES = [7, 10];
+// One cartela purchase at a time per player (fast taps are queued, not doubled).
+const cartelaBuyQueue = new Map();
 io.on("connection", (socket) => {
   
   //console.log("New connection:", socket.id);
@@ -646,6 +650,10 @@ socket.on("authenticate", async ({ initData }) => {
 
   const { telegramId, username, clientId } = auth;
   const rId = String(roomId);
+  if (!ALLOWED_STAKES.includes(Number(rId))) {
+    socket.emit("error", { message: "Room not found" });
+    return;
+  }
   socket.join(rId);
 
   // Store mappings (optional for backwards compatibility)
@@ -712,64 +720,96 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
   socket.emit("playerStatus", { inGame: true, selectedCartelas });
 });
   // --- SELECT CARTELA ---
-  socket.on("selectCartela", async ({ roomId, cartelaIndex }) => {
+  socket.on("selectCartela", ({ roomId, cartelaIndex }) => {
   const auth = authenticatedSockets.get(socket.id);
   if (!auth) {
     socket.emit("cartelaRejected", { message: "Not authenticated" });
     return;
   }
-  const { clientId, username } = auth;
-  const rId = String(roomId);
+  const { clientId } = auth;
+  // run this player's purchases one after another
+  const prev = cartelaBuyQueue.get(clientId) || Promise.resolve();
+  const next = prev.then(() => buyCartela(socket, clientId, roomId, cartelaIndex)).catch(() => {});
+  cartelaBuyQueue.set(clientId, next);
+  next.then(() => { if (cartelaBuyQueue.get(clientId) === next) cartelaBuyQueue.delete(clientId); });
+});
 
-  if (!rooms[rId] || rooms[rId].selectedIndexes.includes(cartelaIndex)) {
+async function buyCartela(socket, clientId, roomId, cartelaIndex) {
+  const rId = String(roomId);
+  const room = rooms[rId];
+  const stake = Number(rId);
+  const idx = Number(cartelaIndex);
+
+  // 1. Only real rooms and real cartelas
+  if (!room || !ALLOWED_STAKES.includes(stake)) {
+    socket.emit("cartelaRejected", { message: "Cartela already taken or room not found" });
+    return;
+  }
+  if (!Number.isInteger(idx) || idx < 0 || idx >= cartela.length) {
+    socket.emit("cartelaRejected", { message: "Invalid cartela" });
+    return;
+  }
+
+  // 2. Selection window
+  if (room.activeGame || (room.timer !== null && room.timer <= 4)) {
     socket.emit("cartelaRejected", {
-      message: "Cartela already taken or room not found",
+      message: "The game is about to start or is already active. Cartela selection is closed."
     });
     return;
   }
 
+  const roomUsername = room.players[clientId];
+  if (!roomUsername) {
+    socket.emit("cartelaRejected", { message: "User not found in room" });
+    return;
+  }
+  if (!room.playerCartelas[clientId]) room.playerCartelas[clientId] = [];
+  const userCartelas = room.playerCartelas[clientId];
+
+  if (userCartelas.length >= 6) {
+    socket.emit("cartelaRejected", { message: "You can only select up to 6 cartelas" });
+    return;
+  }
+
+  // 3. Reserve the cartela BEFORE waiting for the database,
+  //    so a second player can't pass the "is it free?" check
+  if (room.selectedIndexes.includes(idx)) {
+    socket.emit("cartelaRejected", { message: "Cartela already taken or room not found" });
+    return;
+  }
+  room.selectedIndexes.push(idx);
+  const release = () => {
+    const i = room.selectedIndexes.indexOf(idx);
+    if (i !== -1) room.selectedIndexes.splice(i, 1);
+  };
+
   try {
-    // Get username from rooms (it should match auth.username)
-    const roomUsername = rooms[rId].players[clientId];
-    if (!roomUsername) {
-      socket.emit("cartelaRejected", { message: "User not found in room" });
-      return;
-    }
-
-    const user = await BingoBord.findOne({ username: roomUsername });
-    const stake = Number(rId);
-
-    if (!user || user.Wallet < stake) {
+    // 4. Take the money in ONE step, only if the balance covers it
+    const user = await BingoBord.findOneAndUpdate(
+      { username: roomUsername, Wallet: { $gte: stake } },
+      { $inc: { Wallet: -stake } },
+      { new: true }
+    );
+    if (!user) {
+      release();
       socket.emit("cartelaRejected", { message: "Insufficient balance or user not found" });
       return;
     }
 
-    if (!rooms[rId].playerCartelas[clientId])
-      rooms[rId].playerCartelas[clientId] = [];
-    const userCartelas = rooms[rId].playerCartelas[clientId];
-
-    if (rooms[rId].activeGame || (rooms[rId].timer !== null && rooms[rId].timer <= 4)) {
+    // 5. If the game started while we waited, give the money back
+    if (room.activeGame) {
+      await BingoBord.updateOne({ _id: user._id }, { $inc: { Wallet: stake } });
+      release();
       socket.emit("cartelaRejected", {
         message: "The game is about to start or is already active. Cartela selection is closed."
       });
       return;
     }
 
-    if (userCartelas.length >= 6) {
-      socket.emit("cartelaRejected", { message: "You can only select up to 6 cartelas" });
-      return;
-    }
-
-    // Deduct wallet
-    user.Wallet -= stake;
-    await user.save();
-
-    userCartelas.push(cartelaIndex);
-    rooms[rId].selectedIndexes.push(cartelaIndex);
-
-    socket.emit("cartelaAccepted", { cartelaIndex, Wallet: user.Wallet });
+    userCartelas.push(idx);
+    socket.emit("cartelaAccepted", { cartelaIndex: idx, Wallet: user.Wallet });
     io.to(rId).emit("updateSelectedCartelas", {
-      selectedIndexes: rooms[rId].selectedIndexes,
+      selectedIndexes: room.selectedIndexes,
     });
 
     if (userCartelas.length === 1) {
@@ -777,28 +817,11 @@ socket.on("checkPlayerStatus", ({ roomId }) => {   // no clientId from client
     }
   } catch (err) {
     console.error("Error selecting cartela:", err);
+    release();
     socket.emit("cartelaRejected", { message: "Server error" });
   }
-});
+}
 
-
-  // --- CALL NUMBER ---
-  socket.on("callNumber", ({ roomId, number }) => {
-    if (!rooms[roomId]) return;
-    const room = rooms[roomId];
-    if (!room.calledNumbers.includes(number)) room.calledNumbers.push(number);
-
-    io.to(roomId).emit("numberCalled", number);
-    io.to(roomId).emit(
-      "currentCalledNumbers",
-      room.calledNumbers.slice(-5).reverse()
-    );
-    io.to(roomId).emit("updateSelectedCartelas", {
-      selectedIndexes: room.selectedIndexes,
-    });
-
-    checkWinners(roomId, number);
-  });
 
   // ==========================================
   // FPL MULTIPLAYER MATCHMAKING
