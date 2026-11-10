@@ -185,15 +185,18 @@ const forcedPlayersData = [
     
     // --- NEW PLAYERS ---
     { username: 'adisu', clientId: '200014x' },
+   
     { username: 'mesi', clientId: '200015x' },
+    
     { username: 'ruth', clientId: '200016x' },
     { username: 'markose', clientId: '2000787x' },
-    
     { username: 'yosi', clientId: '200019x' },
     { username: 'sisco', clientId: '200020x' },
     { username: 'yaredo', clientId: '200021x' },
     { username: 'derara', clientId: '200017x' },
-    { username: 'suura', clientId: '200018x' },
+    { username: 'suura', clientId: '200018x' }
+     /*
+    
     { username: 'ermii', clientId: 'client-tariku-bot' },
     { username: 'salim', clientId: 'client-cita-bot' },
     { username: 'admas', clientId: 'client-chkuni-bot' },
@@ -204,8 +207,6 @@ const forcedPlayersData = [
      {username: "jemal_76545",clientId: '200032x'},
      {username: "kida_25133",clientId: '200031x'},
      {username: "ali_987630",clientId: '200030x'},
-
-
 
       { username: "wonde_ty4", clientId: '2000455x' },
     { username: "turi_su", clientId: '2000967x' },
@@ -219,7 +220,7 @@ const forcedPlayersData = [
     { username: "burabu_3456", clientId: '200037bx' },
     { username: "mastushewa", clientId: '200037gx' },
     { username: "gerekirkose", clientId: '200037jx' },
-    //greae
+     
     { username: "kibrom_98766", clientId: '20003011' },
    { username: "mesfin_turo", clientId: '2000311' },
     { username: "mulatu_7546", clientId: '2000321' },
@@ -231,9 +232,26 @@ const forcedPlayersData = [
           { username: "alex_dere2", clientId: '2003372' },
            { username: "doc_eremi", clientId: '2004372' },
             { username: "biruk_mec", clientId: '2005372' },
-             { username: "gramachew", clientId: '2006372' }
-           
-    
+             { username: "gramachew", clientId: '2006372' },
+         
+    { username: "eyobe bale", clientId: '2000398011' },
+   { username: "lamilove", clientId: '200090811' },
+    { username: "fre_45321", clientId: '2000708321' },
+     { username: "balageru4353", clientId: '2000908331' },
+      { username: "kalidhatric", clientId: '2000908341' },
+       { username: "nebila_tre", clientId: '2000908351' },
+        { username: "bereket_45674", clientId: '2009081372' },
+         { username: "eyueeel", clientId: '2009082372' },
+
+
+           { username: "yonyx2", clientId: '2100398011' },
+   { username: "dnebereabebe", clientId: '210090811' },
+    { username: "awelekasim", clientId: '2100708321' },
+     { username: "amede ambachewe", clientId: '2100908331' },
+      { username: "mesud alewi", clientId: '2100908341' },
+       { username: "amir muhamed", clientId: '2100908351' },
+        { username: "yonatan tekle", clientId: '2109081372' },
+         { username: "awete estifanose", clientId: '2009082372' }*/
 ];
 // Note: clientId must be unique strings for the game logic to work correctly.
 const NUM_CARTELAS_PER_PLAYER = 1;
