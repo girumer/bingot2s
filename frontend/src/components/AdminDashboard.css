@@ -198,3 +198,24 @@
   .ad-kpi strong { font-size: 20px; }
   .ad-search { min-width: 0; width: 100%; }
 }
+
+/* Phones: stack wide tables into readable cards so Amount + Confirm are never cut off */
+@media (max-width: 640px) {
+  .ad-table-wrap { margin: 0; padding: 0; overflow-x: visible; }
+  .ad-table thead { display: none; }
+  .ad-table, .ad-table tbody, .ad-table tr, .ad-table td { display: block; width: 100%; }
+  .ad-table tr {
+    border: 1px solid var(--line); border-radius: 12px;
+    margin-bottom: 10px; padding: 8px 12px; background: var(--bg);
+  }
+  .ad-table td {
+    border: none; padding: 5px 0; white-space: normal;
+    text-align: left !important; display: flex; justify-content: space-between; gap: 12px;
+  }
+  .ad-table td::before {
+    content: attr(data-label); color: var(--muted); font-size: 12px; font-weight: 600;
+  }
+  .ad-table td.ad-actions { justify-content: flex-end; padding-top: 8px; }
+  .ad-table td.ad-actions::before { content: ""; }
+  .ad-table td .ad-btn { width: 100%; }
+}

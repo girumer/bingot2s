@@ -114,6 +114,7 @@ const KenoTicketSchema = new mongoose.Schema({
   multiplier: { type: Number, default: 0 },
   payout: { type: Number, default: 0 },
   status: { type: String, enum: ["pending", "won", "lost"], default: "pending", index: true },
+  isBot: { type: Boolean, default: false, index: true },
   createdAt: { type: Date, default: Date.now },
 });
 KenoTicketSchema.index({ drawId: 1, status: 1 });
@@ -187,6 +188,18 @@ function phoneLabel(phoneNumber, fallback) {
   return chars.length >= 2 ? `${chars[0]}***${chars[chars.length - 1]}` : "***";
 }
 
+// What other players see for a real player: initials of the name,
+// e.g. "girum berhanu" -> "g****b". Falls back to the phone mask if no name.
+function nameLabel(name, phoneNumber) {
+  const raw = String(name || "").trim();
+  const words = raw.split(/\s+/).filter(Boolean);
+  let a, b;
+  if (words.length >= 2) { a = words[0][0]; b = words[words.length - 1][0]; }
+  else if (raw.length >= 2) { a = raw[0]; b = raw[raw.length - 1]; }
+  if (a && b) return `${a}****${b}`.toLowerCase();
+  return phoneLabel(phoneNumber, raw || "player");
+}
+
 // Score one ticket against a draw.
 function scoreTicket(ticket, drawn) {
   const { betType = "numbers", picks = [], stake } = ticket;
@@ -250,7 +263,25 @@ function parseBet(body) {
   }
   return { bet: { betType, stake, draws, picks } };
 }
-
+const KENO_BOTS = {
+  enabled: true,
+  intervalMs: 400,          // your requested cadence
+  maxBotsPerDraw: 40,       // cap so a draw doesn't fill instantly
+  minPicks: 3,
+  maxPicks: 6,
+  minStake: 2,
+  maxStake: 20,             // matches KENO_CONFIG
+  names: [
+    "amanu","soloman","adisu","mesi","ruth","markose","yosi","sisco",
+    "yaredo","derara","suura","ermii","salim","admas","telila_65432",
+    "medi_4563","redwan_45655","tsegihshmuze","jemal_76545","kida_25133",
+    "ali_987630","wonde_ty4","turi_su","alexsuckss","jamiks","habiboo",
+    "fitse_23434","maamokacha","fillimoon","sabirlove2","burabu_3456",
+    "mastushewa","gerekirkose","kibrom_98766","mesfin_turo","mulatu_7546",
+    "teme_abo","filaman_454595","ermi_adama","buzaman_5454","musat_5474",
+    "alex_dere2","doc_eremi","biruk_mec","gramachew"
+  ],
+};
 // ---------------- SETUP ----------------
 function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) {
   function authUser(initData) {
@@ -271,7 +302,39 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
       console.error("[KENO] ledger write failed:", err.message, entry);
     }
   }
+function randomBotTicketInput() {
+  const n = KENO_CONFIG.MIN_PICKS +
+    crypto.randomInt(KENO_CONFIG.MAX_PICKS - KENO_CONFIG.MIN_PICKS + 1);
+  const picks = new Set();
+  while (picks.size < n) picks.add(crypto.randomInt(80) + 1);
+  return {
+    picks: [...picks].sort((a, b) => a - b),
+    stake: KENO_CONFIG.MIN_STAKE +
+      crypto.randomInt(KENO_CONFIG.MAX_STAKE - KENO_CONFIG.MIN_STAKE + 1),
+  };
+}
 
+  async function injectBotTicket(drawId) {
+    if (!KENO_BOTS.enabled) return null;
+
+    const name = KENO_BOTS.names[crypto.randomInt(KENO_BOTS.names.length)];
+    const { picks, stake } = randomBotTicketInput();
+
+    // Bot tickets are virtual: no wallet debit, no ledger row.
+    const ticket = await KenoTicket.create({
+      drawId,
+      telegramId: -crypto.randomInt(1_000_000_000),
+      username: `bot_${name}`,
+      label: nameLabel(name),
+      betType: "numbers",
+      picks,
+      stake,
+      isBot: true,
+      status: "pending",
+    });
+
+    return ticket;
+  }
   // ---------------- GAME ROUND STATE ----------------
   // Only the main process (core 0) serves players, so the round lives in memory.
   // phase: "waiting" | "betting" | "drawing" | "checking"
@@ -315,7 +378,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
   const publicTicket = (t) => ({
     id: String(t._id),
     drawId: t.drawId,
-    name: t.label || phoneLabel(null, t.username),
+    name: t.label || nameLabel(t.username),
     betType: t.betType || "numbers",
     picks: t.picks || [],
     stake: t.stake,
@@ -463,7 +526,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
               drawId,
               telegramId: user.id,
               username: player.username,
-              label: phoneLabel(player.phoneNumber, player.username),
+              label: nameLabel(player.username, player.phoneNumber),
               betType: bet.betType,
               picks: bet.picks,
               stake: bet.stake,
@@ -554,8 +617,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
         profit: round2(t.staked - t.paid),
         payback: t.staked ? round2((t.paid / t.staked) * 100) : null,
       });
-
-      const pending = await KenoTicket.find({ status: "pending" }, { stake: 1 }).lean();
+      const pending = await KenoTicket.find({ status: "pending", isBot: false }, { stake: 1 }).lean();
       res.json({
         days,
         totals: finish(totals),
@@ -587,14 +649,16 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
   }
 
   async function settleDraw(draw) {
-    const tickets = await KenoTicket.find({ drawId: draw.drawId, status: "pending" }).lean();
+    // ---------- Real tickets: score, pay, ledger ----------
+    const realTickets = await KenoTicket.find({
+      drawId: draw.drawId, status: "pending", isBot: false,
+    }).lean();
+
     const sum = { tickets: 0, staked: 0, paid: 0, winners: 0 };
     const inc = {};
 
-    for (const t of tickets) {
+    for (const t of realTickets) {
       const { matches, multiplier, payout } = scoreTicket(t, draw.numbers);
-      // Only the call that flips the ticket from "pending" pays it, so a
-      // ticket can never be paid twice.
       const updated = await KenoTicket.findOneAndUpdate(
         { _id: t._id, status: "pending" },
         { $set: { matches, multiplier, payout, status: payout > 0 ? "won" : "lost" } }
@@ -622,6 +686,22 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
       }
     }
 
+    // ---------- Bot tickets: score for DISPLAY only, never pay ----------
+    const botTickets = await KenoTicket.find({
+      drawId: draw.drawId, status: "pending", isBot: true,
+    }).lean();
+
+    for (const t of botTickets) {
+      const { matches, multiplier, payout } = scoreTicket(t, draw.numbers);
+      // payout/multiplier are stored so the UI can show "WON 190 ETB" —
+      // but no BingoBord update, no WalletLedger row, no KenoDrawReport.inc.
+      await KenoTicket.updateOne(
+        { _id: t._id, status: "pending" },
+        { $set: { matches, multiplier, payout, status: payout > 0 ? "won" : "lost" } }
+      );
+    }
+
+    // ---------- Report (real money only) ----------
     if (sum.tickets) {
       await KenoDrawReport.updateOne(
         { drawId: draw.drawId },
@@ -631,7 +711,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
         },
         { upsert: true }
       );
-      console.log(`[KENO] Draw ${draw.drawId}: ${sum.tickets} tickets, staked ${sum.staked}, paid ${round2(sum.paid)}`);
+      console.log(`[KENO] Draw ${draw.drawId}: ${sum.tickets} real tickets, staked ${sum.staked}, paid ${round2(sum.paid)}`);
     }
   }
 
@@ -639,10 +719,12 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
   let running = false;
   let ready = false;
   let lastIdleCheck = 0;
+  let lastBotAt = 0;  
 
   async function nextGame() {
     startBetting(round.drawId + 1);
   }
+
 
   async function tick() {
     if (running || !ready) return;
@@ -650,8 +732,23 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     try {
       const now = Date.now();
 
+      // --- Bot injection (only during the betting phase) ---
+      if (
+        round.phase === "betting" &&
+        now - lastBotAt >= KENO_BOTS.intervalMs &&
+        round.drawAt - now > 2000
+      ) {
+        lastBotAt = now;
+        const count = await KenoTicket.countDocuments({ drawId: round.drawId });
+        if (count < KENO_BOTS.maxBotsPerDraw) {
+          const botTicket = await injectBotTicket(round.drawId);
+          if (botTicket) io.emit("keno:bet", { tickets: [publicTicket(botTicket)] });
+        }
+      }
+      // -----------------------------------------------------
+
+      // --- Phase transitions (ORIGINAL — do not delete) ---
       if (round.phase === "betting" && now >= round.drawAt) {
-        // Countdown over: draw 20 numbers, settle tickets, start calling.
         const draw = await getOrCreateDraw(round.drawId);
         await settleDraw(draw);
         round.phase = "drawing";
@@ -666,9 +763,10 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
       } else if (round.phase === "checking" && now >= round.endsAt) {
         await nextGame();
       } else if (round.phase === "waiting" && now - lastIdleCheck > 15000) {
-        // Safety net only (tickets normally start the countdown directly).
         lastIdleCheck = now;
-        if (await KenoTicket.exists({ drawId: round.drawId, status: "pending" })) startBetting(round.drawId);
+        if (await KenoTicket.exists({ drawId: round.drawId, status: "pending" })) {
+          startBetting(round.drawId);
+        }
       }
     } catch (err) {
       console.error("[KENO] loop error:", err);
@@ -676,6 +774,7 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
       running = false;
     }
   }
+
 
   // On startup: settle anything left over, then resume where we were.
   async function init() {
@@ -702,6 +801,14 @@ function setupKeno({ app, io, BingoBord, verifyTelegramInitData, verifyAdmin }) 
     setInterval(tick, 250);
     // Online count for everyone with the keno page open, every 5 seconds.
     setInterval(() => io.to("keno").emit("keno:online", { online: onlineCount() }), 5000);
+    // Keep the table tidy: delete virtual bot tickets older than a day
+    // (they are only for the live list; real tickets are never touched).
+    setInterval(async () => {
+      try {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        await KenoTicket.deleteMany({ isBot: true, createdAt: { $lt: cutoff } });
+      } catch (err) { console.error("[KENO] bot cleanup error:", err); }
+    }, 60 * 60 * 1000);
   }
 }
 
@@ -715,4 +822,5 @@ module.exports = {
   validatePicks,
   parseBet,
   drawSummary,
+  
 };

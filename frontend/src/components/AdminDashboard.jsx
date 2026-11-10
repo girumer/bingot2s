@@ -424,12 +424,12 @@ export default function AdminDashboard() {
                 <tbody>
                   {payShown.map((r) => (
                     <tr key={r._id}>
-                      <td className="ad-strong">{payTab === "withdrawals" ? r.withdrawalId : r.depositId ?? r.transactionNumber}</td>
-                      <td>{r.phoneNumber}</td>
-                      <td><span className={`ad-chip ${r.type}`}>{r.type}</span></td>
-                      <td className="ad-num">{fmt(r.amount)}</td>
-                      <td><span className={`ad-chip st-${r.status || "pending"}`}>{r.status || "pending"}</span></td>
-                      <td className="ad-muted">{when(r.createdAt)}</td>
+                      <td className="ad-strong" data-label="#">{payTab === "withdrawals" ? r.withdrawalId : r.depositId ?? r.transactionNumber}</td>
+                      <td data-label="Phone">{r.phoneNumber}</td>
+                      <td data-label="Via"><span className={`ad-chip ${r.type}`}>{r.type}</span></td>
+                      <td className="ad-num" data-label="Amount">{fmt(r.amount)}</td>
+                      <td data-label="Status"><span className={`ad-chip st-${r.status || "pending"}`}>{r.status || "pending"}</span></td>
+                      <td className="ad-muted" data-label="Date">{when(r.createdAt)}</td>
                       <td className="ad-actions">
                         <button className="ad-btn primary sm" onClick={() => (payTab === "withdrawals" ? confirmWithdrawal(r) : confirmDeposit(r))}>Confirm</button>
                       </td>
@@ -457,11 +457,11 @@ export default function AdminDashboard() {
                 <tbody>
                   {txShown.map((t) => (
                     <tr key={t._id}>
-                      <td className="ad-strong ad-mono">{t.transactionNumber}</td>
-                      <td><span className={`ad-chip ${t.type}`}>{t.type}</span></td>
-                      <td className="ad-num">{fmt(t.amount)}</td>
-                      <td className="ad-msg" title={t.rawMessage}>{t.rawMessage}</td>
-                      <td className="ad-muted">{when(t.createdAt)}</td>
+                      <td className="ad-strong ad-mono" data-label="Txn #">{t.transactionNumber}</td>
+                      <td data-label="Via"><span className={`ad-chip ${t.type}`}>{t.type}</span></td>
+                      <td className="ad-num" data-label="Amount">{fmt(t.amount)}</td>
+                      <td className="ad-msg" title={t.rawMessage} data-label="Message">{t.rawMessage}</td>
+                      <td className="ad-muted" data-label="Received">{when(t.createdAt)}</td>
                     </tr>
                   ))}
                   {!txShown.length && <tr><td colSpan={5} className="ad-empty">No waiting deposit messages.</td></tr>}

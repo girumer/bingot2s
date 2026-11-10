@@ -133,6 +133,9 @@ exports.broadcastToAllCustomers = async (req, res) => {
     try {
         const allUsers = await BingoBord.find({}, 'telegramId');
         const token = process.env.BOT_TOKEN; // main bot token
+        const supportUrl = /^https?:\/\//.test(process.env.SUPPORT_GROUP || "")
+            ? process.env.SUPPORT_GROUP
+            : "https://" + (process.env.SUPPORT_GROUP || "t.me/adeyebingo");
 
         const message = `🎱🔥 አደይ ባንጎ ከቢንጎ በተጨማሪ FAST KENO መጣ! 😎⚡️
        
@@ -149,7 +152,7 @@ exports.broadcastToAllCustomers = async (req, res) => {
 
                                 👉 @adeyebingo_bot
                                  ሳፖርት ግሩፑን ለመቀላቀል
-                                 [እዚህ ይጫኑ](${process.env.SUPPORT_GROUP}) 
+                                 <a href="${supportUrl}">እዚህ ይጫኑ</a> 
                                                                          `;
 
         let successCount = 0;
@@ -161,7 +164,7 @@ exports.broadcastToAllCustomers = async (req, res) => {
                     await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
                         chat_id: user.telegramId,
                         text: message,
-                        parse_mode: 'Markdown'
+                        parse_mode: 'HTML'
                     });
                     successCount++;
                 } catch (error) {
