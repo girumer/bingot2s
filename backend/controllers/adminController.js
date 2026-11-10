@@ -134,17 +134,23 @@ exports.broadcastToAllCustomers = async (req, res) => {
         const allUsers = await BingoBord.find({}, 'telegramId');
         const token = process.env.BOT_TOKEN; // main bot token
 
-        const message = `🌼እንኳዋን ለ2019 አዲስ አመት  በሰላም አደረሳችሁ 🌼
+        const message = `🎱🔥 አደይ ባንጎ ከቢንጎ በተጨማሪ FAST KENO መጣ! 😎⚡️
        
-                        🌼   ስንል በአሉ የሰላም  |እና የጤና |እነዲሆንላችሁ በ፣መመኝት ነው🌼
-        💸💸 አደይ በምን ይለያል? 💸 💸
-         💰💰ሲመዝገቡ ነጻ መጫወቻ ቦነስ💰💰
-        🎁🎁ዲፖዚት ሲያርጉ ዲፖዚት ያረጉትን 10% ተጨማሪ ቦነስ🎁🎁
-        🎁🎁6 ካርቴላ ድረስ መምረጥ የሚችሉብት🎁🎁
-        💸💸 ባሸነፉ ቁጥር የኮይን ሽልማት ኮይኑን ወድ ብር  ወደያው መቀየር ሚችሉበት 💸 💸
-ሳፖርት ግሩፑን ለመቀላቀል
-[እዚህ ይጫኑ](${process.env.SUPPORT_GROUP}) 
-`;
+                       
+                             👑 Adeye Bingo እና FAST KENO በአንድ ላይ!
+
+                             🎱 BINGO  ካርድህን ምረጥ፣ ቁጥሮችን ተከታተል፣ ቢንጎ በል!
+
+                             ⚡️ FAST KENO  እድለኛ ቁጥሮችህን ምረጥ፣ ፈጣኑን ጨዋታ አጣጥም!
+
+                               💰 ዕድልህን ሞክር፣ ለሽልማት ተወዳደር!
+
+                                🚀 አሁኑኑ ግባና ጨዋታውን አቀልጥፍ!
+
+                                👉 @adeyebingo_bot
+                                 ሳፖርት ግሩፑን ለመቀላቀል
+                                 [እዚህ ይጫኑ](${process.env.SUPPORT_GROUP}) 
+                                                                         `;
 
         let successCount = 0;
         let failCount = 0;
