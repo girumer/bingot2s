@@ -453,7 +453,6 @@ const FastKeno = () => {
             <div className="kn-stats">
               <div><span>PLAYERS</span><strong>{live.players}</strong></div>
               <div><span>TICKETS</span><strong>{live.tickets}</strong></div>
-              <div><span>ONLINE</span><strong>{online}</strong></div>
               <div><span>MY OPEN</span><strong>{tickets.filter((t) => t.status === "pending").length}</strong></div>
             </div>
 
