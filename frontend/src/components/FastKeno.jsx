@@ -523,7 +523,7 @@ const FastKeno = () => {
 
                 <p className="kn-fine">
                   20 of 80 numbers are drawn at random, one per second. Prizes come from fixed tables, so everyone has the
-                  same chance. On average the game pays back about 50% of stakes.
+                  same chance. On average the game pays back about 60% of stakes.
                   {config ? ` Max win per ticket: ${config.MAX_WIN_PER_TICKET.toLocaleString()} ETB.` : ""}
                 </p>
               </>

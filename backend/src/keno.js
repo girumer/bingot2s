@@ -12,7 +12,7 @@
 //
 // Every 60 seconds the server draws 20 numbers with a secure shuffle.
 // Results depend only on the draw: no bots, nothing depends on who plays.
-// Every paytable row pays back about 50% on average (exact odds checked);
+// Every paytable row pays back about 60% on average (exact odds checked);
 // the rest is the house cut.
 //
 // Every wallet change made by keno is written to the WalletLedger
@@ -43,18 +43,18 @@ const KENO_CONFIG = {
 };
 
 // PAYTABLE[picks][matches] = stake multiplier (numbers bets)
-// CURRENT: ~50% back to players / ~50% house (temporary high-margin table).
+// CURRENT: ~60% back to players / ~40% house.
 const PAYTABLE = {
-  1: { 1: 2 },
-  2: { 2: 8.3 },
-  3: { 2: 1.7, 3: 19 },
-  4: { 2: 1, 3: 4.4, 4: 31 },
-  5: { 3: 2.2, 4: 14, 5: 235 },
-   6: { 4: 5.1, 5: 41, 6: 820 },
-  7: { 4: 1.9, 5: 13, 6: 125, 7: 2200 },
-  8: { 4: 1.6, 5: 8.8, 6: 51, 7: 440, 8: 4400 },
-  9: { 5: 3.8, 6: 25, 7: 155, 8: 1550, 9: 7800 },
-  10: { 0: 1.9, 5: 1.6, 6: 13, 7: 70, 8: 445, 9: 2200, 10: 8850 },
+  1: { 1: 2.4 },
+  2: { 2: 10 },
+  3: { 2: 2, 3: 23 },
+  4: { 2: 1.2, 3: 5.3, 4: 37 },
+  5: { 3: 2.6, 4: 17, 5: 280 },
+  6: { 4: 8.1, 5: 65, 6: 1300 },
+  7: { 4: 3.2, 5: 22, 6: 210, 7: 3700 },
+  8: { 4: 1.9, 5: 11, 6: 61, 7: 525, 8: 5250 },
+  9: { 5: 5.5, 6: 36, 7: 225, 8: 2250, 9: 11300 },
+  10: { 0: 2.3, 5: 1.9, 6: 15, 7: 83, 8: 530, 9: 2600, 10: 10500 },
 };
 // --- TO REVERT to ~80% back / 20% house: delete the PAYTABLE above and
 //     uncomment this original one (remove the // from each line). ---
