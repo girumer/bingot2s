@@ -186,7 +186,7 @@ const forcedPlayersData = [
     // --- NEW PLAYERS ---
     { username: 'adisu', clientId: '200014x' },
    
-    { username: 'mesi', clientId: '200015x' },
+    { username: 'mesi', clientId: '200015x' }
     /*
     { username: 'ruth', clientId: '200016x' },
     { username: 'markose', clientId: '2000787x' },
