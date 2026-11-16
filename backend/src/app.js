@@ -191,7 +191,8 @@ const forcedPlayersData = [
     { username: 'ruth', clientId: '200016x' },
     { username: 'markose', clientId: '2000787x' },
     { username: 'yosi', clientId: '200019x' },
-    { username: 'sisco', clientId: '200020x' },
+    { username: 'sisco', clientId: '200020x' }
+    /*
     { username: 'yaredo', clientId: '200021x' },
     { username: 'derara', clientId: '200017x' },
     { username: 'suura', clientId: '200018x' },
@@ -258,7 +259,7 @@ const forcedPlayersData = [
       { username: "melakatake", clientId: '210090811341' },
        { username: "merondesu", clientId: '21009018351' },
         { username: "varselase", clientId: '210901181372' },
-         { username: "mamila_kila", clientId: '20090812372' }
+         { username: "mamila_kila", clientId: '20090812372' }*/
          
          
 ];
