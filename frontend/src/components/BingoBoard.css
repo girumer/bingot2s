@@ -561,31 +561,121 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
 /* ==========================================================================
    7. GAME WINNER MODALS
    ========================================================================== */
+/* ===== Winner celebration popup ===== */
 .winner-popup {
   position: fixed;
-  top: 10%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #ece3e3;
-  color: white;
-  padding: 15px;
-  border-radius: 10px;
+  inset: 0;
   z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 10, 22, 0.74);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: winner-fade 0.25s ease both;
+  overflow: hidden;
+}
+@keyframes winner-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.winner-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  max-height: 88vh;
+  overflow-y: auto;
   text-align: center;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-  max-width: 90%;
+  padding: 20px 16px 22px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, #1d2748 0%, #121a35 55%, #1e1236 100%);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  animation: winner-pop 0.5s cubic-bezier(.18,.9,.3,1.3) both;
+}
+.winner-card::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 22px;
+  padding: 2px;
+  background: linear-gradient(135deg, #ffd700, #ff8a00, #fff3b0, #ffd700);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+  animation: winner-glow 2s ease-in-out infinite;
+}
+@keyframes winner-glow {
+  0%,100% { filter: drop-shadow(0 0 3px rgba(255,215,0,.45)); }
+  50%     { filter: drop-shadow(0 0 16px rgba(255,170,0,.9)); }
+}
+@keyframes winner-pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+.winner-trophy {
+  font-size: 52px; line-height: 1; margin-bottom: 2px;
+  animation: trophy-bounce 1.1s ease-in-out infinite;
+  filter: drop-shadow(0 4px 10px rgba(255,180,0,.55));
+}
+@keyframes trophy-bounce {
+  0%,100% { transform: translateY(0) rotate(-4deg); }
+  50%     { transform: translateY(-8px) rotate(4deg); }
+}
+
+.winner-popup h2 {
+  margin: 0 0 8px;
+  font-size: 26px; font-weight: 900; letter-spacing: .5px;
+  background: linear-gradient(90deg, #ffd700, #fff6c2, #ffae00, #ffd700);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: winner-shine 2.5s linear infinite;
+}
+@keyframes winner-shine { to { background-position: 200% center; } }
+
+.winner-prize {
+  display: inline-block;
+  margin: 0 auto 14px;
+  padding: 7px 18px;
+  font-size: 20px; font-weight: 900; color: #06210f;
+  background: linear-gradient(135deg, #ffe169, #ffb020);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(255,170,0,.45);
+  animation: prize-pulse 1.3s ease-in-out infinite;
+}
+@keyframes prize-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
+.winner-cartelas-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; color: #01060b; }
+.winner-cartela {
+  min-width: 150px; flex: 0 1 auto;
+  animation: winner-pop 0.6s cubic-bezier(.18,.9,.3,1.3) both; animation-delay: .12s;
+}
+.winner-cartela.cartela-display {
+  max-width: 210px;
+  background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%);
+  box-shadow: 0 10px 28px rgba(0,0,0,.45);
+}
+.winner-cartela .cartela-index {
+  color: #ffd700; font-size: 11px; margin-top: 8px;
+  background: rgba(0,0,0,.28); border-radius: 8px; padding: 4px 6px;
 }
 
 .winner-highlight {
-  background-color: rgb(15, 139, 98) !important;
-  border: 3px solid rgb(20, 12, 17) !important;
-  color: rgb(12, 10, 10);
-  font-weight: bold !important;
-  transform: scale(1.1);
+  background: linear-gradient(135deg, #16a34a, #22c55e) !important;
+  border: 2px solid #ffffff !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 10px rgba(34,197,94,.9);
+  animation: cell-pop 0.9s ease-in-out infinite;
 }
-.winner-popup h2 { margin-bottom: 10px; color: #01060b; }
-.winner-cartelas-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; color: #01060b; }
-.winner-cartela { min-width: 120px; color: white; flex: 1 0 auto; }
+@keyframes cell-pop { 0%,100% { transform: scale(1.05); } 50% { transform: scale(1.18); } }
+
+.winner-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.winner-confetti .confetti {
+  position: absolute; top: -14px; width: 9px; height: 14px;
+  border-radius: 2px; opacity: .95;
+  animation: confetti-fall linear infinite;
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(96vh) rotate(560deg); opacity: 0; }
+}
 
 /* ==========================================================================
    8. SMARTPHONE MEDIA ADAPTATION (Perfect responsive fit)

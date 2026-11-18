@@ -565,8 +565,24 @@ useEffect(() => {
       {/* WINNER POPUP */}
       {showPopup && (
         <div className="winner-popup">
-          <h2>{iAmWinner ? "🎉 You won! 🎉" : "Winner(s)!"}</h2>
-          <div className="cartelas-container-horizontal winner-cartelas-container">
+          <div className="winner-confetti" aria-hidden="true">
+            {Array.from({ length: 16 }).map((_, i) => (
+              <span
+                key={i}
+                className="confetti"
+                style={{
+                  left: `${(i * 6.1 + 4) % 95}%`,
+                  background: ["#ffd700", "#ff5e7e", "#4dd4ff", "#9b6bff", "#4ade80", "#ffa63d", "#ff79c6"][i % 7],
+                  animationDuration: `${2.3 + (i % 5) * 0.35}s`,
+                  animationDelay: `${(i % 7) * 0.22}s`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="winner-card">
+            <div className="winner-trophy">🏆</div>
+            <h2>{iAmWinner ? "🎉 YOU WON! 🎉" : (winners.length > 1 ? "🎉 WINNERS! 🎉" : "🎉 WINNER! 🎉")}</h2>
+            <div className="cartelas-container-horizontal winner-cartelas-container">
             {winners.map((w, idx) => {
               const winnerCartela = cartela[w.cartelaIndex];
               if (!winnerCartela) return null;
@@ -613,6 +629,7 @@ useEffect(() => {
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
       )}

@@ -198,7 +198,8 @@ const forcedPlayersData = [
     { username: 'suura', clientId: '200018x' },
     { username: 'ermii', clientId: 'client-tariku-bot' },
     { username: 'salim', clientId: 'client-cita-bot' },
-    { username: 'admas', clientId: 'client-chkuni-bot' },
+    { username: 'admas', clientId: 'client-chkuni-bot' }
+    /*
     {username: "telila_65432",clientId: '200037x'},
     {username: "medi_4563",clientId: '200035x'},
     {username: "redwan_45655",clientId: '200034x'},
@@ -259,7 +260,7 @@ const forcedPlayersData = [
        { username: "merondesu", clientId: '21009018351' },
         { username: "varselase", clientId: '210901181372' },
          { username: "mamila_kila", clientId: '20090812372' }
-         
+      */   
          
 ];
 // Note: clientId must be unique strings for the game logic to work correctly.
