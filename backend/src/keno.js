@@ -272,14 +272,9 @@ const KENO_BOTS = {
   minStake: 2,
   maxStake: 20,             // matches KENO_CONFIG
   names: [
-    "amanu","soloman","adisu","mesi","ruth","markose","yosi","sisco",
-    "yaredo","derara","suura","ermii","salim","admas","telila_65432",
-    "medi_4563","redwan_45655","tsegihshmuze","jemal_76545","kida_25133",
-    "ali_987630","wonde_ty4","turi_su","alexsuckss","jamiks","habiboo",
-    "fitse_23434","maamokacha","fillimoon","sabirlove2","burabu_3456",
-    "mastushewa","gerekirkose","kibrom_98766","mesfin_turo","mulatu_7546",
-    "teme_abo","filaman_454595","ermi_adama","buzaman_5454","musat_5474",
-    "alex_dere2","doc_eremi","biruk_mec","gramachew"
+    "amanu","soloman","adisu","mesi","ruth","markose","yosi","sisco"
+   
+   
   ],
 };
 // ---------------- SETUP ----------------
