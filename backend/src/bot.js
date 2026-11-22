@@ -852,7 +852,7 @@ if (state.referrerId) {
         ],
       },
       {
-        $inc: { Wallet: 0, referralCount: 1 },
+        $inc: { Wallet: 5, referralCount: 1 },
       },
       { new: true }
     );
@@ -1149,7 +1149,7 @@ case "referral":
     const captionText = `
 <i>Here is your personal referral link!</i>
 
-ከታች ያለውን ሊንክ ለወዳጆቾ በመጋበዝ ጓደኛዎን ሲጋብዙ 2 ብር ያገኛሉ።
+ከታች ያለውን ሊንክ ለወዳጆቾ በመጋበዝ ጓደኛዎን ሲጋብዙ 5 ብር ያገኛሉ።
 
 🔗 ${referralLink}
 

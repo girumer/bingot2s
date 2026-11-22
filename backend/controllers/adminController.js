@@ -137,18 +137,13 @@ exports.broadcastToAllCustomers = async (req, res) => {
             ? process.env.SUPPORT_GROUP
             : "https://" + (process.env.SUPPORT_GROUP || "t.me/adeyebingo");
 
-        const message = `🎱🔥 አደይ ባንጎ ከቢንጎ በተጨማሪ FAST KENO መጣ! 😎⚡️
-       
-                       
-                             👑 Adeye Bingo እና FAST KENO በአንድ ላይ!
-
-                             🎱 BINGO  ካርድህን ምረጥ፣ ቁጥሮችን ተከታተል፣ ቢንጎ በል!
-
-                             ⚡️ FAST KENO  እድለኛ ቁጥሮችህን ምረጥ፣ ፈጣኑን ጨዋታ አጣጥም!
-
-                               💰 ዕድልህን ሞክር፣ ለሽልማት ተወዳደር!
-
-                                🚀 አሁኑኑ ግባና ጨዋታውን አቀልጥፍ!
+        const message = `🎉🎉 አደይ ቢንጎና  ኬኖ ላይ ሰው ጋብዘው ሲያስመዘግብ
+                        5 ብር ቦነስ እንደሚያገኙ ያቃሉ ?ቦት ውስጥ በመግባት invite የሚለውን በመጫን ጓደኞቾን ይጋብዙ🎉🎉
+                            👑Adeye Bingo እና FAST KENO በአንድ ላይ!👑
+                            🎱 BINGO  ካርድህን ምረጥ፣ ቁጥሮችን ተከታተል፣ ቢንጎ በል!🎱
+                            ⚡️⚡️FAST KENO  እድለኛ ቁጥሮችህን ምረጥ፣ ፈጣኑን ጨዋታ አጣጥም!⚡️⚡️
+                              💰 ዕድልህን ሞክር፣ ለሽልማት ተወዳደር!💰
+                              🚀 አሁኑኑ ግባና ጨዋታውን አቀልጥፍ!🚀
 
                                 👉 @adeyebingo_bot
                                  ሳፖርት ግሩፑን ለመቀላቀል
